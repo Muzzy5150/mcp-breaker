@@ -11,3 +11,4 @@ coverage/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+artifacts/demo-assessment.json

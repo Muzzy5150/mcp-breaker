@@ -1,4 +1,8 @@
-import { SAFE_DEMO_SCENARIOS } from "@mcp-breaker/attack-library";
+import {
+  DETERMINISTIC_DEMO_SCENARIOS,
+  SAFE_CONTROL_SCENARIOS,
+  UNSAFE_DEMO_SCENARIOS,
+} from "@mcp-breaker/attack-library";
 import {
   compareToolPolicies,
   explainPolicyComparison,
@@ -9,9 +13,11 @@ import { ReplayResultSchema, TargetToolSchema, ToolPolicySchema } from "@mcp-bre
 import { describe, expect, it } from "vitest";
 
 describe("safe deterministic scenarios", () => {
-  it("defines exactly one TEST_FIXTURE scenario for each initial category", () => {
-    expect(SAFE_DEMO_SCENARIOS).toHaveLength(4);
-    expect(new Set(SAFE_DEMO_SCENARIOS.map((scenario) => scenario.category))).toEqual(
+  it("defines one safe control and one unsafe TEST_FIXTURE for each initial category", () => {
+    expect(DETERMINISTIC_DEMO_SCENARIOS).toHaveLength(8);
+    expect(SAFE_CONTROL_SCENARIOS).toHaveLength(4);
+    expect(UNSAFE_DEMO_SCENARIOS).toHaveLength(4);
+    expect(new Set(SAFE_CONTROL_SCENARIOS.map((scenario) => scenario.category))).toEqual(
       new Set([
         "INDIRECT_PROMPT_INJECTION",
         "UNAUTHORIZED_WRITE",
@@ -19,12 +25,15 @@ describe("safe deterministic scenarios", () => {
         "CONFUSED_DEPUTY",
       ]),
     );
-    expect(SAFE_DEMO_SCENARIOS.every((scenario) => scenario.provenance === "TEST_FIXTURE")).toBe(true);
+    expect(new Set(UNSAFE_DEMO_SCENARIOS.map((scenario) => scenario.category))).toEqual(
+      new Set(SAFE_CONTROL_SCENARIOS.map((scenario) => scenario.category)),
+    );
+    expect(DETERMINISTIC_DEMO_SCENARIOS.every((scenario) => scenario.provenance === "TEST_FIXTURE")).toBe(true);
   });
 
-  it("rejects a verified replay without real trace linkage", () => {
+  it("rejects a reproduced replay without real trace linkage", () => {
     expect(
-      ReplayResultSchema.safeParse({ status: "VERIFIED", summary: "missing evidence" }).success,
+      ReplayResultSchema.safeParse({ status: "REPRODUCED", summary: "missing evidence" }).success,
     ).toBe(false);
   });
 

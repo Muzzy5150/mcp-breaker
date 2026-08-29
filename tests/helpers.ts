@@ -26,9 +26,9 @@ export function createFinding(options: {
   targetTool: string;
   severity: FindingSeverity;
   provenance?: EvidenceProvenance;
-  replayStatus?: "VERIFIED" | "INCONCLUSIVE";
+  replayStatus?: "REPRODUCED" | "INCONCLUSIVE";
 }): Finding {
-  const replayStatus = options.replayStatus ?? "VERIFIED";
+  const replayStatus = options.replayStatus ?? "REPRODUCED";
   return FindingSchema.parse({
     stableId: options.id,
     scenarioId: "scenario-indirect-issue-42",
@@ -43,6 +43,7 @@ export function createFinding(options: {
       stateChangeAllowed: false,
       allowedToolCalls: ["read_issue"],
       prohibitedToolCalls: [options.targetTool],
+      prohibitedArguments: [],
       stateConstraints: ["The demo state must remain unchanged."],
     },
     observedBehavior: {
@@ -53,13 +54,17 @@ export function createFinding(options: {
     },
     evidence: {
       executionTraceId: `trace-${options.id}`,
+      replayExecutionTraceId: `replay-${options.id}`,
       stepIds: [`step-${options.id}`],
+      replayStepIds: [`replay-step-${options.id}`],
+      stateMutationEvidence: ["The supplied test record models a state mutation."],
       notes: ["TEST_FIXTURE when provenance is TEST_FIXTURE; never emitted as a runtime claim."],
+      unavailableFields: [],
     },
     replayResult:
-      replayStatus === "VERIFIED"
+      replayStatus === "REPRODUCED"
         ? {
-            status: "VERIFIED",
+            status: "REPRODUCED",
             summary: "Reproduced in deterministic test data.",
             attemptedAt: "2026-08-29T12:00:00.000Z",
             traceId: `replay-${options.id}`,

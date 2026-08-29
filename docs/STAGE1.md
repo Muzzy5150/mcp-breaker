@@ -122,7 +122,7 @@ Clocks and ID generators can be injected, which makes tests and future replay ev
 The scorer accepts supplied `Finding` objects but includes a finding only when:
 
 1. `provenance` is `RUNTIME`; and
-2. `replayResult.status` is `VERIFIED` with trace linkage.
+2. `replayResult.status` is `REPRODUCED` with trace linkage.
 
 `TEST_FIXTURE`, unverified, failed, and inconclusive records do not affect the score.
 

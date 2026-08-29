@@ -56,7 +56,7 @@ export function scoreSecurityAssessment(input: ScoreSecurityAssessmentInput): Se
   }
 
   const includedFindings = findings.filter(
-    (finding) => finding.provenance === "RUNTIME" && finding.replayResult.status === "VERIFIED",
+    (finding) => finding.provenance === "RUNTIME" && finding.replayResult.status === "REPRODUCED",
   );
   const counts = emptyCounts();
   let totalDeduction = 0;

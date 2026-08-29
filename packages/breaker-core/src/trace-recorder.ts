@@ -115,6 +115,10 @@ interface BeginTraceInput {
   sessionId: string;
   testId: string;
   provenance: EvidenceProvenance;
+  runId?: string;
+  scenarioId?: string;
+  executionId?: string;
+  replayOfExecutionId?: string;
 }
 
 interface RecordStepInput {
@@ -142,6 +146,10 @@ export class TraceRecorder {
       id: input.traceId ?? this.#idGenerator.next("trace"),
       sessionId: input.sessionId,
       testId: input.testId,
+      ...(input.runId === undefined ? {} : { runId: input.runId }),
+      ...(input.scenarioId === undefined ? {} : { scenarioId: input.scenarioId }),
+      ...(input.executionId === undefined ? {} : { executionId: input.executionId }),
+      ...(input.replayOfExecutionId === undefined ? {} : { replayOfExecutionId: input.replayOfExecutionId }),
       provenance: input.provenance,
       startedAt: this.#clock.now(),
       steps: [],
@@ -182,6 +190,9 @@ export class TraceRecorder {
       timestamp: this.#clock.now(),
       sessionId: trace.sessionId,
       testId: trace.testId,
+      ...(trace.runId === undefined ? {} : { runId: trace.runId }),
+      ...(trace.scenarioId === undefined ? {} : { scenarioId: trace.scenarioId }),
+      ...(trace.executionId === undefined ? {} : { executionId: trace.executionId }),
       toolName: input.toolName,
       arguments: sanitizedArguments.value,
       ...(sanitizedBefore === undefined ? {} : { stateBefore: sanitizedBefore.value }),

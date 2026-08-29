@@ -61,7 +61,27 @@ A candidate does not become a finding until replay verifies it. Aggregate scores
 
 ## Current implementation boundary
 
-Stage 1 now implements the deterministic local demo target and framework-neutral core data model. The current repository contains an in-memory MCP target, safe scenario fixtures, evidence recording, verified-finding scoring, and policy data/validation. It contains no autonomous attack agent, model client, TrueForge adapter, external integration, or dashboard finding claim.
+Stages 1 and 2 now implement the deterministic local demo target and evaluation pipeline. The repository contains an in-memory MCP target, paired safe/unsafe scenario fixtures, an execution-adapter boundary, rule-based evaluation, clean-state replay, evidence-backed finding promotion, verified-finding scoring, and policy data/validation. It contains no autonomous attack agent, model client, TrueForge adapter, external integration, or dashboard finding claim.
+
+The Stage 2 flow is:
+
+```text
+scenario suite
+    ↓
+ScenarioRunner → ExecutionAdapter → deterministic demo tool service
+    ↓
+expected-versus-observed evaluation
+    ↓
+PASS / CANDIDATE_FINDING / INCONCLUSIVE / EXECUTION_ERROR
+                    ↓ candidates only
+             clean-state replay
+                    ↓ reproduced only
+               RUNTIME Finding
+                    ↓
+          verified-finding scoring
+```
+
+The deterministic adapter executes authored test steps and is not an agent runtime. Runtime provenance on a promoted finding means its local tool events and mutations actually occurred; it does not mean an AI autonomously discovered the behavior. Reports retain the deterministic-demo label and link original and replay executions with run, scenario, execution, and trace identifiers.
 
 TrueForge integration remains intentionally deferred until hackathon model credentials are available. When integration begins, it should be added as an adapter around the existing shared schemas and trace model rather than embedded into the demo target.
 
@@ -77,15 +97,15 @@ Implemented locally: deliberately unsafe fixture content, a resettable in-memory
 
 ### Stage 2 — deterministic scenario runner and verifier
 
-Build a non-model runner that executes only the four predefined local scenarios, resets and replays demo state, compares observed traces with expected behavior, and produces candidate outcomes without fabricating findings. Add a machine-readable local assessment report and explicit inconclusive/error states.
+Implemented locally: a non-model runner executes eight authored scenarios (safe and unsafe pairs for four categories), resets and replays demo state, compares observed traces and state with structured expectations, promotes only reproduced candidates, and emits a schema-validated machine-readable assessment. Explicit pass, candidate, inconclusive, execution-error, reproduced, non-reproduced, and replay-error states are represented.
 
 ### Stage 3 — initial attack execution
 
 Implement the four initial attack classes using TrueForge sessions, subagents where useful, and isolated execution. Keep attack inputs deterministic enough for live demonstration and replay.
 
-### Stage 4 — verification and scoring
+### Stage 4 — live verification and scoring
 
-Reset target state, replay candidate successes, promote only reproducible outcomes to findings, and calculate severity and aggregate scores from verified evidence.
+Apply the Stage 2 replay and scoring contracts to TrueForge-driven executions. Reset target state, replay candidate successes through the live adapter, promote only reproducible outcomes, and compare live behavior with the deterministic engine baseline.
 
 ### Stage 5 — remediation and approval
 

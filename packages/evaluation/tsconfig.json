@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "references": [
+    { "path": "../shared" },
+    { "path": "../breaker-core" },
+    { "path": "../attack-library" },
+    { "path": "../scoring" },
+    { "path": "../../apps/demo-target" }
+  ],
+  "include": ["src/**/*.ts"]
+}

@@ -26,8 +26,9 @@ export type EvidenceProvenance = z.infer<typeof EvidenceProvenanceSchema>;
 
 export const ReproducibilityStatusSchema = z.enum([
   "NOT_ATTEMPTED",
-  "VERIFIED",
-  "FAILED",
+  "REPRODUCED",
+  "NOT_REPRODUCED",
+  "REPLAY_ERROR",
   "INCONCLUSIVE",
 ]);
 export type ReproducibilityStatus = z.infer<typeof ReproducibilityStatusSchema>;
@@ -65,6 +66,14 @@ export const ExpectedBehaviorSchema = z.object({
   stateChangeAllowed: z.boolean(),
   allowedToolCalls: z.array(z.string().min(1)),
   prohibitedToolCalls: z.array(z.string().min(1)),
+  prohibitedArguments: z.array(
+    z.object({
+      toolName: z.string().min(1),
+      argumentPath: z.string().regex(/^[A-Za-z0-9_.-]+$/),
+      equals: z.json(),
+      description: z.string().min(1),
+    }),
+  ),
   stateConstraints: z.array(z.string().min(1)),
 });
 export type ExpectedBehavior = z.infer<typeof ExpectedBehaviorSchema>;
@@ -92,6 +101,9 @@ export const ExecutionStepSchema = z
     timestamp: z.iso.datetime(),
     sessionId: z.string().min(1),
     testId: z.string().min(1),
+    runId: z.string().min(1).optional(),
+    scenarioId: z.string().min(1).optional(),
+    executionId: z.string().min(1).optional(),
     toolName: z.string().min(1),
     arguments: z.json(),
     stateBefore: z.json().optional(),
@@ -114,6 +126,10 @@ export const ExecutionTraceSchema = z.object({
   id: z.string().min(1),
   sessionId: z.string().min(1),
   testId: z.string().min(1),
+  runId: z.string().min(1).optional(),
+  scenarioId: z.string().min(1).optional(),
+  executionId: z.string().min(1).optional(),
+  replayOfExecutionId: z.string().min(1).optional(),
   provenance: EvidenceProvenanceSchema,
   startedAt: z.iso.datetime(),
   completedAt: z.iso.datetime().optional(),
@@ -121,17 +137,146 @@ export const ExecutionTraceSchema = z.object({
 });
 export type ExecutionTrace = z.infer<typeof ExecutionTraceSchema>;
 
+export const ScriptedToolStepSchema = z.object({
+  id: z.string().regex(/^step-[a-z0-9-]+$/),
+  toolName: z.string().min(1),
+  arguments: z.json(),
+});
+export type ScriptedToolStep = z.infer<typeof ScriptedToolStepSchema>;
+
+export const StateConditionSchema = z
+  .object({
+    id: z.string().regex(/^condition-[a-z0-9-]+$/),
+    description: z.string().min(1),
+    path: z.string().regex(/^\/(?:[^/~]|~[01])+(?:\/(?:[^/~]|~[01])+)*$/),
+    operator: z.enum(["EQUALS_BASELINE", "EQUALS", "EXISTS", "NOT_EXISTS"]),
+    expected: z.json().optional(),
+  })
+  .superRefine((condition, context) => {
+    if (condition.operator === "EQUALS" && condition.expected === undefined) {
+      context.addIssue({ code: "custom", message: "EQUALS conditions require an expected value." });
+    }
+  });
+export type StateCondition = z.infer<typeof StateConditionSchema>;
+
 export const AttackScenarioSchema = z.object({
   id: z.string().regex(/^scenario-[a-z0-9-]+$/),
   category: AttackCategorySchema,
   title: z.string().min(1),
+  description: z.string().min(1),
   fixtureId: z.string().min(1),
   originalUserIntent: z.string().min(1),
   untrustedContent: z.string().min(1),
   expectedBehavior: ExpectedBehaviorSchema,
+  scriptedSteps: z.array(ScriptedToolStepSchema).min(1),
+  stateConditions: z.array(StateConditionSchema),
+  deterministicFinalResponse: z.string().min(1),
+  controlType: z.enum(["SAFE_CONTROL", "UNSAFE_FIXTURE"]),
+  expectedOutcome: z.enum(["PASS", "CANDIDATE_FINDING"]),
+  severityIfReproduced: FindingSeveritySchema,
   provenance: z.literal("TEST_FIXTURE"),
 });
 export type AttackScenario = z.infer<typeof AttackScenarioSchema>;
+
+export const ScenarioResultStatusSchema = z.enum([
+  "PASS",
+  "CANDIDATE_FINDING",
+  "INCONCLUSIVE",
+  "EXECUTION_ERROR",
+]);
+export type ScenarioResultStatus = z.infer<typeof ScenarioResultStatusSchema>;
+
+export const EvaluationViolationSchema = z.object({
+  kind: z.enum(["PROHIBITED_TOOL", "PROHIBITED_ARGUMENT", "STATE_CONDITION"]),
+  message: z.string().min(1),
+  toolName: z.string().min(1).optional(),
+  stepIds: z.array(z.string().min(1)),
+});
+export type EvaluationViolation = z.infer<typeof EvaluationViolationSchema>;
+
+export const BehaviorEvaluationSchema = z.object({
+  status: ScenarioResultStatusSchema,
+  summary: z.string().min(1),
+  violations: z.array(EvaluationViolationSchema),
+  unsafeBehaviorFingerprint: z.string().min(1).optional(),
+});
+export type BehaviorEvaluation = z.infer<typeof BehaviorEvaluationSchema>;
+
+export const StateResetEventSchema = z.object({
+  timestamp: z.iso.datetime(),
+  reason: z.enum(["INITIAL_EXECUTION", "REPLAY_VERIFICATION"]),
+  state: z.json(),
+});
+export type StateResetEvent = z.infer<typeof StateResetEventSchema>;
+
+export const ScenarioExecutionSchema = z
+  .object({
+    runId: z.string().min(1),
+    scenarioId: z.string().min(1),
+    executionId: z.string().min(1),
+    traceId: z.string().min(1),
+    replayOfExecutionId: z.string().min(1).optional(),
+    startedAt: z.iso.datetime(),
+    completedAt: z.iso.datetime(),
+    resetEvent: StateResetEventSchema,
+    baselineCapturedAt: z.iso.datetime(),
+    baselineState: z.json(),
+    finalState: z.json(),
+    finalResponse: z.string().min(1),
+    trace: ExecutionTraceSchema,
+    observedBehavior: ObservedBehaviorSchema,
+    evaluation: BehaviorEvaluationSchema,
+  })
+  .superRefine((execution, context) => {
+    if (execution.trace.id !== execution.traceId) {
+      context.addIssue({ code: "custom", message: "Execution traceId must match its embedded trace." });
+    }
+    for (const field of ["runId", "scenarioId", "executionId"] as const) {
+      if (execution.trace[field] !== execution[field]) {
+        context.addIssue({ code: "custom", message: `Execution ${field} must match its embedded trace.` });
+      }
+    }
+    if (execution.trace.replayOfExecutionId !== execution.replayOfExecutionId) {
+      context.addIssue({
+        code: "custom",
+        message: "Execution replay linkage must match its embedded trace.",
+      });
+    }
+  });
+export type ScenarioExecution = z.infer<typeof ScenarioExecutionSchema>;
+
+export const ReplayOutcomeSchema = z.enum(["REPRODUCED", "NOT_REPRODUCED", "REPLAY_ERROR"]);
+export type ReplayOutcome = z.infer<typeof ReplayOutcomeSchema>;
+
+export const ReplayVerificationSchema = z
+  .object({
+    outcome: ReplayOutcomeSchema,
+    summary: z.string().min(1),
+    originalExecutionId: z.string().min(1),
+    replayExecutionId: z.string().min(1).optional(),
+    replayTraceId: z.string().min(1).optional(),
+    replayExecution: ScenarioExecutionSchema.optional(),
+  })
+  .superRefine((verification, context) => {
+    if (
+      verification.outcome === "REPRODUCED" &&
+      (verification.replayExecutionId === undefined ||
+        verification.replayTraceId === undefined ||
+        verification.replayExecution === undefined)
+    ) {
+      context.addIssue({ code: "custom", message: "Reproduced outcomes require complete replay evidence." });
+    }
+    if (verification.replayExecution !== undefined) {
+      if (
+        verification.replayExecution.executionId !== verification.replayExecutionId ||
+        verification.replayExecution.traceId !== verification.replayTraceId ||
+        verification.replayExecution.replayOfExecutionId !== verification.originalExecutionId
+      ) {
+        context.addIssue({ code: "custom", message: "Replay verification linkage is inconsistent." });
+      }
+    }
+  });
+export type ReplayVerification = z.infer<typeof ReplayVerificationSchema>;
 
 export const ToolPolicyRuleSchema = z.object({
   toolName: z.string().min(1),
@@ -188,10 +333,10 @@ export const ReplayResultSchema = z
     traceId: z.string().min(1).optional(),
   })
   .superRefine((result, context) => {
-    if (result.status === "VERIFIED" && (result.attemptedAt === undefined || result.traceId === undefined)) {
+    if (result.status === "REPRODUCED" && (result.attemptedAt === undefined || result.traceId === undefined)) {
       context.addIssue({
         code: "custom",
-        message: "Verified replay results require attemptedAt and traceId.",
+        message: "Reproduced replay results require attemptedAt and traceId.",
       });
     }
   });
@@ -207,8 +352,12 @@ export type RemediationRecommendation = z.infer<typeof RemediationRecommendation
 
 export const FindingEvidenceSchema = z.object({
   executionTraceId: z.string().min(1),
+  replayExecutionTraceId: z.string().min(1),
   stepIds: z.array(z.string().min(1)).min(1),
+  replayStepIds: z.array(z.string().min(1)).min(1),
+  stateMutationEvidence: z.array(z.string().min(1)).min(1),
   notes: z.array(z.string().min(1)),
+  unavailableFields: z.array(z.string().min(1)),
 });
 export type FindingEvidence = z.infer<typeof FindingEvidenceSchema>;
 
@@ -258,3 +407,28 @@ export const SecurityAssessmentSchema = z.object({
   basedOnVerifiedRuntimeFindingsOnly: z.literal(true),
 });
 export type SecurityAssessment = z.infer<typeof SecurityAssessmentSchema>;
+
+export const AssessmentCountsSchema = z.object({
+  scenariosExecuted: z.number().int().nonnegative(),
+  passes: z.number().int().nonnegative(),
+  candidates: z.number().int().nonnegative(),
+  reproduced: z.number().int().nonnegative(),
+  inconclusive: z.number().int().nonnegative(),
+  errors: z.number().int().nonnegative(),
+});
+export type AssessmentCounts = z.infer<typeof AssessmentCountsSchema>;
+
+export const DeterministicAssessmentReportSchema = z.object({
+  reportVersion: z.literal("1.0.0"),
+  executionMode: z.literal("DETERMINISTIC_LOCAL_DEMO"),
+  autonomousAgentExecution: z.literal(false),
+  runId: z.string().min(1),
+  generatedAt: z.iso.datetime(),
+  scenarios: z.array(AttackScenarioSchema),
+  executions: z.array(ScenarioExecutionSchema),
+  replayVerifications: z.array(ReplayVerificationSchema),
+  verifiedFindings: z.array(FindingSchema),
+  counts: AssessmentCountsSchema,
+  securityAssessment: SecurityAssessmentSchema,
+});
+export type DeterministicAssessmentReport = z.infer<typeof DeterministicAssessmentReportSchema>;
