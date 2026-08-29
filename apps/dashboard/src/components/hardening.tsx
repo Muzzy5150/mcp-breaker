@@ -147,6 +147,10 @@ function LiveHardeningResults({ report }: { report: LiveHardeningReport }) {
   const before = report.baselineAssessment;
   const after = report.hardenedAssessment;
   const remediated = report.remediationResults.filter((result) => result.status === "REMEDIATED").length;
+  const baselineRecommendations = before.verifiedFindings.length === 0;
+  const policyEntries = baselineRecommendations
+    ? report.policyGenerationProvenance.filter((entry) => report.requireApprovalForTools.includes(entry.toolName))
+    : report.policyDiff;
   return (
     <>
       <div className="hardening-truth-banner hardening-truth-banner-live">
@@ -166,18 +170,21 @@ function LiveHardeningResults({ report }: { report: LiveHardeningReport }) {
           <span>{after.verifiedFindings.length} verified findings</span>
         </article>
         <article className="hardening-proof-count">
-          <p className="eyebrow">Live remediation proofs</p>
-          <strong>{remediated}<small>/{report.remediationResults.length}</small></strong>
-          <span>new-session replay verified</span>
+          <p className="eyebrow">{baselineRecommendations ? "Approval enforcement" : "Live remediation proofs"}</p>
+          <strong>{baselineRecommendations ? report.requireApprovalForTools.length : remediated}<small>/{baselineRecommendations ? report.requireApprovalForTools.length : report.remediationResults.length}</small></strong>
+          <span>{baselineRecommendations ? "baseline safety gates" : "new-session replay verified"}</span>
         </article>
       </div>
       <div className="hardening-subsection">
         <div className="hardening-subheading">
-          <div><p className="eyebrow">Policy applied to test agent</p><h3>{report.policyDiff.length} effective changes</h3></div>
+          <div>
+            <p className="eyebrow">{baselineRecommendations ? "Baseline Safety Recommendations" : "Policy applied to test agent"}</p>
+            <h3>{baselineRecommendations ? `${report.requireApprovalForTools.length} destructive tool approval gates` : `${report.policyDiff.length} effective changes`}</h3>
+          </div>
           <span className="count-chip">{report.requireApprovalForTools.length} approval gates</span>
         </div>
         <div className="hardening-list">
-          {report.policyDiff.map((change) => (
+          {policyEntries.map((change) => (
             <article key={change.toolName}>
               <span className="hardening-icon"><LockKeyhole aria-hidden="true" size={16} /></span>
               <div><code>{change.toolName}</code><small>{change.reason}</small></div>
@@ -189,7 +196,7 @@ function LiveHardeningResults({ report }: { report: LiveHardeningReport }) {
           ))}
         </div>
       </div>
-      <div className="hardening-subsection">
+      {!baselineRecommendations ? <div className="hardening-subsection">
         <div className="hardening-subheading">
           <div><p className="eyebrow">Hardened retest</p><h3>TrueForge approval evidence</h3></div>
           <span className="count-chip count-chip-pass">{remediated} remediated</span>
@@ -221,7 +228,7 @@ function LiveHardeningResults({ report }: { report: LiveHardeningReport }) {
             );
           })}
         </div>
-      </div>
+      </div> : null}
     </>
   );
 }

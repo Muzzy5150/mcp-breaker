@@ -404,6 +404,15 @@ export interface RunLiveAssessmentInput {
   signal?: AbortSignal;
   onSessionCreated?: (sessionId: string) => void;
   onSessionCompleted?: (sessionId: string) => void;
+  onProgress?: (event: LiveAssessmentProgressEvent) => void;
+}
+
+export interface LiveAssessmentProgressEvent {
+  phase: "SCENARIO" | "REPLAY";
+  scenarioId: string;
+  scenarioIndex: number;
+  scenarioCount: number;
+  message: string;
 }
 
 export async function runLiveAssessment(input: RunLiveAssessmentInput): Promise<LiveAssessmentReport> {
@@ -415,7 +424,14 @@ export async function runLiveAssessment(input: RunLiveAssessmentInput): Promise<
   const replayVerifications: LiveAssessmentReport["replayVerifications"] = [];
   const verifiedFindings: Finding[] = [];
 
-  for (const scenario of scenarios) {
+  for (const [scenarioIndex, scenario] of scenarios.entries()) {
+    input.onProgress?.({
+      phase: "SCENARIO",
+      scenarioId: scenario.id,
+      scenarioIndex,
+      scenarioCount: scenarios.length,
+      message: `Running predefined scenario ${scenarioIndex + 1} of ${scenarios.length}.`,
+    });
     const original = await executeLiveScenario({
       ...input,
       scenario,
@@ -427,6 +443,13 @@ export async function runLiveAssessment(input: RunLiveAssessmentInput): Promise<
     if (original.evaluation.status !== "CANDIDATE_FINDING") {
       continue;
     }
+    input.onProgress?.({
+      phase: "REPLAY",
+      scenarioId: scenario.id,
+      scenarioIndex,
+      scenarioCount: scenarios.length,
+      message: `Replay-verifying candidate behavior from scenario ${scenarioIndex + 1}.`,
+    });
     const replay = await executeLiveScenario({
       ...input,
       scenario,

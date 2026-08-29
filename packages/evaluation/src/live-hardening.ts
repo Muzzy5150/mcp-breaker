@@ -21,6 +21,7 @@ import {
 } from "@mcp-breaker/shared";
 
 import { executeLiveScenario, runLiveAssessment, type ApprovalDecider, type LiveInfrastructureEvidence } from "./live-assessment.js";
+import type { LiveAssessmentProgressEvent } from "./live-assessment.js";
 import { approvalToolsFromPolicy, HARDENED_AGENT_NAME, reconcileAgent } from "./trueforge-agents.js";
 import type { TrueForgeAgentRecord, TrueForgeFacade } from "./trueforge-client.js";
 
@@ -96,6 +97,15 @@ export interface RunLiveHardeningInput {
   clock?: Clock;
   ids?: IdGenerator;
   signal?: AbortSignal;
+  onSessionCreated?: (sessionId: string) => void;
+  onSessionCompleted?: (sessionId: string) => void;
+  onProgress?: (event: LiveHardeningProgressEvent) => void;
+}
+
+export interface LiveHardeningProgressEvent {
+  phase: "BASELINE" | "POLICY" | "RETESTING";
+  assessment?: LiveAssessmentProgressEvent;
+  message: string;
 }
 
 export async function runLiveHardening(input: RunLiveHardeningInput): Promise<{
@@ -111,6 +121,11 @@ export async function runLiveHardening(input: RunLiveHardeningInput): Promise<{
     agent: input.baselineAgent,
     clock,
     ids,
+    onProgress: (event) => input.onProgress?.({
+      phase: "BASELINE",
+      assessment: event,
+      message: `Baseline policy evidence: ${event.message}`,
+    }),
   });
   const currentPolicy = deriveCurrentDemoPolicy(DEMO_TOOL_METADATA);
   const generated = generateRemediationPolicy({
@@ -138,12 +153,25 @@ export async function runLiveHardening(input: RunLiveHardeningInput): Promise<{
   });
   const policyDiff = provenance.filter((entry) => entry.changed).map((entry) => PolicyChangeSchema.parse(entry));
   const requireApprovalForTools = approvalToolsFromPolicy(proposedPolicy);
+  input.onProgress?.({
+    phase: "POLICY",
+    message: `Applied ${requireApprovalForTools.length} approval gate${requireApprovalForTools.length === 1 ? "" : "s"} to the hardened test agent.`,
+  });
   const reconciled = await reconcileAgent(input.client, HARDENED_AGENT_NAME, requireApprovalForTools);
+  input.onProgress?.({
+    phase: "RETESTING",
+    message: "Retesting the same predefined scenarios with TrueForge approval enforcement.",
+  });
   const initialHardenedAssessment = await runLiveAssessment({
     ...input,
     agent: reconciled.agent,
     clock,
     ids,
+    onProgress: (event) => input.onProgress?.({
+      phase: "RETESTING",
+      assessment: event,
+      message: `Hardened retest: ${event.message}`,
+    }),
   });
   const hardenedExecutions = [...initialHardenedAssessment.executions];
   const remediationResults: LiveHardeningReport["remediationResults"] = [];

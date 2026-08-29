@@ -58,7 +58,26 @@ export interface TrueForgeDoctorReport {
   messages: string[];
 }
 
-export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueForgeDoctorReport> {
+export interface TrueForgePlatformReadiness {
+  ok: boolean;
+  checkedAt: string;
+  checks: {
+    server: boolean;
+    model: boolean;
+    connector: boolean;
+    connectorAuthorized: boolean;
+    sandbox: boolean;
+    smokeAgentPreserved: boolean;
+  };
+  model: string;
+  connector: { name: string; url: string; authStatus: string };
+  sandbox: { type: string; status: string; statusReason: string | null };
+  messages: string[];
+}
+
+export async function runTrueForgePlatformReadiness(
+  client: TrueForgeFacade,
+): Promise<TrueForgePlatformReadiness> {
   const [capabilities, models, connectors, sandbox, agents] = await Promise.all([
     client.getCapabilities(),
     client.listModels(),
@@ -66,6 +85,40 @@ export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueF
     client.getSandboxProvider(),
     client.listAgents(),
   ]);
+  const connector = connectors.find((candidate) => candidate.name === TRUEFORGE_CONNECTOR);
+  const capabilitiesRecord = isRecord(capabilities) ? capabilities : {};
+  const sandboxCapability = isRecord(capabilitiesRecord.sandbox) ? capabilitiesRecord.sandbox : {};
+  const authStatusRecord = connector !== undefined && isRecord(connector.authStatus) ? connector.authStatus : {};
+  const authStatus = typeof authStatusRecord.status === "string" ? authStatusRecord.status : "unknown";
+  const checks = {
+    server: sandboxCapability.enabled === true,
+    model: models.some((model) => model.name === TRUEFORGE_MODEL),
+    connector: connector?.url === TRUEFORGE_CONNECTOR_URL,
+    connectorAuthorized: authStatus === "not_required" || authStatus === "authorized",
+    sandbox: sandbox.type === "daytona" && sandbox.status === "ready",
+    smokeAgentPreserved: agents.some((agent) => agent.name === SMOKE_AGENT_NAME),
+  };
+  const messages = Object.entries(checks)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => `Failed TrueForge readiness check: ${name}.`);
+  return {
+    ok: Object.values(checks).every(Boolean),
+    checkedAt: new Date().toISOString(),
+    checks,
+    model: TRUEFORGE_MODEL,
+    connector: {
+      name: connector?.name ?? TRUEFORGE_CONNECTOR,
+      url: connector?.url ?? "missing",
+      authStatus,
+    },
+    sandbox,
+    messages,
+  };
+}
+
+export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueForgeDoctorReport> {
+  const readiness = await runTrueForgePlatformReadiness(client);
+  const connectors = await client.listMcpServers();
   const connector = connectors.find((candidate) => candidate.name === TRUEFORGE_CONNECTOR);
   const tools = connector === undefined ? [] : await client.listMcpTools(connector.name);
   const toolNames = tools
@@ -83,22 +136,13 @@ export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueF
     })
     .map((tool) => String(tool.name))
     .sort();
-  const capabilitiesRecord = isRecord(capabilities) ? capabilities : {};
-  const sandboxCapability = isRecord(capabilitiesRecord.sandbox) ? capabilitiesRecord.sandbox : {};
-  const authStatusRecord = connector !== undefined && isRecord(connector.authStatus) ? connector.authStatus : {};
-  const authStatus = typeof authStatusRecord.status === "string" ? authStatusRecord.status : "unknown";
   const checks = {
-    server: sandboxCapability.enabled === true,
-    model: models.some((model) => model.name === TRUEFORGE_MODEL),
-    connector: connector?.url === TRUEFORGE_CONNECTOR_URL,
-    connectorAuthorized: authStatus === "not_required" || authStatus === "authorized",
+    ...readiness.checks,
     connectorTools: DEMO_TOOL_NAMES.every((name) => toolNames.includes(name)),
     outputSchemas:
       missingOutputSchemas.length === 0 &&
       invalidOutputSchemas.length === 0 &&
       tools.length === DEMO_TOOL_NAMES.length,
-    sandbox: sandbox.type === "daytona" && sandbox.status === "ready",
-    smokeAgentPreserved: agents.some((agent) => agent.name === SMOKE_AGENT_NAME),
   };
   const messages = Object.entries(checks)
     .filter(([, passed]) => !passed)
@@ -110,9 +154,9 @@ export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueF
     connector: {
       name: connector?.name ?? TRUEFORGE_CONNECTOR,
       url: connector?.url ?? "missing",
-      authStatus,
+      authStatus: readiness.connector.authStatus,
     },
-    sandbox,
+    sandbox: readiness.sandbox,
     toolNames,
     missingOutputSchemas,
     invalidOutputSchemas,
