@@ -1,0 +1,19 @@
+{
+  "name": "@mcp-breaker/demo-target",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@mcp-breaker/breaker-core": "*",
+    "@mcp-breaker/shared": "*",
+    "@modelcontextprotocol/node": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "zod": "4.5.2"
+  }
+}

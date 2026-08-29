@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/breaker-core" },
+    { "path": "packages/attack-library" },
+    { "path": "packages/scoring" },
+    { "path": "apps/demo-target" }
+  ]
+}

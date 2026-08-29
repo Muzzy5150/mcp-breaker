@@ -3,6 +3,10 @@
 .env.*
 !.env.example
 node_modules/
+dist/
+coverage/
+.eslintcache
+*.tsbuildinfo
 *.log
 *.sqlite
 *.sqlite-shm
