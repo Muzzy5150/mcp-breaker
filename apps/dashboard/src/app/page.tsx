@@ -16,7 +16,6 @@ export default async function DashboardPage() {
       <header className="topbar">
         <a className="brand" href="#overview" aria-label="MCP Breaker overview">
           <NeonRGBTextEffect text="MCP BREAKER" className="brand-effect" />
-          <span className="brand-subtitle">Security evidence</span>
         </a>
         <nav aria-label="Dashboard sections">
           <a href="#tools">Tools</a>
