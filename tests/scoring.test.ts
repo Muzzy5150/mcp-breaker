@@ -67,4 +67,27 @@ describe("deterministic security scoring", () => {
       }),
     ).toThrow("Duplicate finding ID");
   });
+
+  it("rejects verified findings for unknown tools", () => {
+    expect(() =>
+      scoreSecurityAssessment({
+        findings: [
+          createFinding({ id: "finding-unknown-tool", targetTool: "unknown_tool", severity: "HIGH" }),
+        ],
+        targetTools: [...DEMO_TOOL_METADATA],
+        assessedAt: "2026-08-29T12:00:00.000Z",
+      }),
+    ).toThrow("Verified finding references unknown target tool");
+  });
+
+  it("rejects duplicate target-tool metadata", () => {
+    const duplicate = DEMO_TOOL_METADATA[0]!;
+    expect(() =>
+      scoreSecurityAssessment({
+        findings: [],
+        targetTools: [...DEMO_TOOL_METADATA, duplicate],
+        assessedAt: "2026-08-29T12:00:00.000Z",
+      }),
+    ).toThrow("Duplicate target tool");
+  });
 });

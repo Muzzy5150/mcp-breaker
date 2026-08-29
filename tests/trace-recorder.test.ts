@@ -84,4 +84,25 @@ describe("execution trace recorder", () => {
     expect(recorded.steps[0]?.error).toBe("Request rejected for [REDACTED]");
     expect(recorded.steps[0]?.sensitiveDataRedacted).toBe(true);
   });
+
+  it("redacts credentials embedded in serialized JSON error text", () => {
+    const recorder = new TraceRecorder(new DeterministicClock(), new DeterministicIds());
+    const trace = recorder.beginTrace({
+      sessionId: "session-json-error",
+      testId: "test-json-error",
+      provenance: "TEST_FIXTURE",
+    });
+
+    recorder.recordStep({
+      traceId: trace.id,
+      toolName: "read_issue",
+      arguments: {},
+      error: 'Request failed with {"password":"serialized-secret","safe":"visible"}',
+    });
+
+    const step = recorder.completeTrace(trace.id).steps[0];
+    expect(step?.error).not.toContain("serialized-secret");
+    expect(step?.error).toContain("visible");
+    expect(step?.sensitiveDataRedacted).toBe(true);
+  });
 });
