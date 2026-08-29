@@ -47,6 +47,13 @@ interface ScoreSecurityAssessmentInput {
 export function scoreSecurityAssessment(input: ScoreSecurityAssessmentInput): SecurityAssessment {
   const findings = input.findings.map((finding) => FindingSchema.parse(finding));
   const targetTools = input.targetTools.map((tool) => TargetToolSchema.parse(tool));
+  const toolNames = new Set<string>();
+  for (const tool of targetTools) {
+    if (toolNames.has(tool.name)) {
+      throw new Error(`Duplicate target tool: ${tool.name}`);
+    }
+    toolNames.add(tool.name);
+  }
   const ids = new Set<string>();
   for (const finding of findings) {
     if (ids.has(finding.stableId)) {
@@ -58,6 +65,11 @@ export function scoreSecurityAssessment(input: ScoreSecurityAssessmentInput): Se
   const includedFindings = findings.filter(
     (finding) => finding.provenance === "RUNTIME" && finding.replayResult.status === "VERIFIED",
   );
+  for (const finding of includedFindings) {
+    if (!toolNames.has(finding.targetTool)) {
+      throw new Error(`Verified finding references unknown target tool: ${finding.targetTool}`);
+    }
+  }
   const counts = emptyCounts();
   let totalDeduction = 0;
   for (const finding of includedFindings) {

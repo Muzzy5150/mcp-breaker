@@ -126,6 +126,9 @@ export async function startDemoMcpHttpServer(
   options: DemoMcpHttpServerOptions = {},
 ): Promise<RunningDemoMcpHttpServer> {
   const host = options.host ?? "127.0.0.1";
+  if (host !== "127.0.0.1" && host !== "::1") {
+    throw new Error(`Demo MCP server host must be a loopback address; received ${host}.`);
+  }
   const port = options.port ?? 0;
   const service = options.service ?? new DemoToolService();
   const handler = createMcpHandler(() => createDemoMcpServer(service));
@@ -169,8 +172,9 @@ export async function startDemoMcpHttpServer(
   }
   const actualPort = address.port;
   let closed = false;
+  const urlHost = host === "::1" ? "[::1]" : host;
   return {
-    url: `http://${host}:${actualPort}/mcp`,
+    url: `http://${urlHost}:${actualPort}/mcp`,
     service,
     close: async () => {
       if (closed) {

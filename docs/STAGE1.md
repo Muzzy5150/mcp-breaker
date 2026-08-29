@@ -113,7 +113,7 @@ Each MCP tool call creates an execution trace containing:
 - stable step ordering;
 - a flag indicating whether sensitive-looking data was redacted.
 
-Arguments and evidence are copied before storage. Keys resembling passwords, secrets, tokens, authorization headers, cookies, or API keys are replaced with `[REDACTED]`. Common credential-shaped string values are also redacted. No project credential is required or loaded.
+Arguments and evidence are copied before storage. Keys resembling passwords, secrets, tokens, authorization headers, cookies, or API keys are replaced with `[REDACTED]`. Common credential-shaped values, including assignments embedded in serialized JSON error text, are also redacted. No project credential is required or loaded.
 
 Clocks and ID generators can be injected, which makes tests and future replay evidence deterministic.
 
@@ -160,7 +160,7 @@ Policy objects remain data only. Stage 1 does not apply them to MCP, TrueForge, 
 - File tools never call Node filesystem APIs.
 - Messaging tools append only to an in-memory array.
 - Pull-request tools modify only in-memory records.
-- The server binds to loopback and validates local Host and Origin headers through the official MCP Node adapter.
+- The server rejects non-loopback bind addresses before opening a listener and validates local Host and Origin headers through the official MCP Node adapter.
 - No credentials, model APIs, paid services, third-party MCP servers, or real repositories are used.
 - No shell, code execution, persistence, credential testing, or exfiltration functionality exists.
 - The explicit safety test creates a host sentinel in an OS temporary directory, attempts absolute and traversal writes through the demo tool, and verifies that the host file remains unchanged.
