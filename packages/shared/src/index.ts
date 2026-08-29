@@ -36,7 +36,7 @@ export type ReproducibilityStatus = z.infer<typeof ReproducibilityStatusSchema>;
 export const PolicyDispositionSchema = z.enum(["ALLOW", "DENY", "REQUIRE_APPROVAL", "SANDBOX_ONLY"]);
 export type PolicyDisposition = z.infer<typeof PolicyDispositionSchema>;
 
-export const PolicyApprovalStatusSchema = z.enum(["DRAFT", "PENDING_APPROVAL", "APPROVED"]);
+export const PolicyApprovalStatusSchema = z.enum(["DRAFT", "PROPOSED", "PENDING_APPROVAL", "APPROVED"]);
 export type PolicyApprovalStatus = z.infer<typeof PolicyApprovalStatusSchema>;
 
 export const TargetToolSchema = z
@@ -432,3 +432,152 @@ export const DeterministicAssessmentReportSchema = z.object({
   securityAssessment: SecurityAssessmentSchema,
 });
 export type DeterministicAssessmentReport = z.infer<typeof DeterministicAssessmentReportSchema>;
+
+export const PolicyDecisionOutcomeSchema = z.enum([
+  "ALLOWED",
+  "BLOCKED",
+  "APPROVAL_REQUIRED",
+  "SANDBOX_REQUIRED",
+]);
+export type PolicyDecisionOutcome = z.infer<typeof PolicyDecisionOutcomeSchema>;
+
+export const PolicyDecisionEvidenceSchema = z
+  .object({
+    id: z.string().min(1),
+    timestamp: z.iso.datetime(),
+    runId: z.string().min(1),
+    scenarioId: z.string().min(1),
+    executionId: z.string().min(1),
+    traceId: z.string().min(1),
+    stepId: z.string().min(1),
+    toolName: z.string().min(1),
+    requestedArguments: z.json(),
+    effectiveDisposition: PolicyDispositionSchema,
+    decision: PolicyDecisionOutcomeSchema,
+    executed: z.boolean(),
+    reason: z.string().min(1),
+    relatedPolicyRule: ToolPolicyRuleSchema.optional(),
+    approvalRequired: z.boolean(),
+    approvalSupplied: z.boolean(),
+    sandboxSatisfied: z.boolean(),
+  })
+  .superRefine((evidence, context) => {
+    if ((evidence.decision === "ALLOWED") !== evidence.executed) {
+      context.addIssue({ code: "custom", message: "Only ALLOWED policy decisions may execute a tool." });
+    }
+    if (evidence.decision === "APPROVAL_REQUIRED" && (!evidence.approvalRequired || evidence.approvalSupplied)) {
+      context.addIssue({ code: "custom", message: "Approval-required decisions must record a missing approval." });
+    }
+    if (evidence.decision === "SANDBOX_REQUIRED" && evidence.sandboxSatisfied) {
+      context.addIssue({ code: "custom", message: "Sandbox-required decisions must record an unsatisfied sandbox." });
+    }
+  });
+export type PolicyDecisionEvidence = z.infer<typeof PolicyDecisionEvidenceSchema>;
+
+export const PolicyRuleProvenanceSchema = z.object({
+  toolName: z.string().min(1),
+  currentDisposition: PolicyDispositionSchema,
+  proposedDisposition: PolicyDispositionSchema,
+  reason: z.string().min(1),
+  relatedFindingIds: z.array(z.string().min(1)),
+  riskClasses: z.array(ToolRiskSchema).min(1),
+  changed: z.boolean(),
+});
+export type PolicyRuleProvenance = z.infer<typeof PolicyRuleProvenanceSchema>;
+
+export const PolicyChangeSchema = PolicyRuleProvenanceSchema.extend({ changed: z.literal(true) });
+export type PolicyChange = z.infer<typeof PolicyChangeSchema>;
+
+export const RemediationStatusSchema = z.enum([
+  "REMEDIATED",
+  "NOT_REMEDIATED",
+  "INCONCLUSIVE",
+  "RETEST_ERROR",
+]);
+export type RemediationStatus = z.infer<typeof RemediationStatusSchema>;
+
+export const RemediationBeforeEvidenceSchema = z.object({
+  userIntent: z.string().min(1),
+  untrustedContent: z.string().min(1),
+  unsafeToolAttempted: z.literal(true),
+  unsafeToolExecuted: z.literal(true),
+  stateMutationOccurred: z.literal(true),
+  replayReproduced: z.literal(true),
+  executionTraceId: z.string().min(1),
+  replayTraceId: z.string().min(1),
+});
+export type RemediationBeforeEvidence = z.infer<typeof RemediationBeforeEvidenceSchema>;
+
+export const RemediationAfterEvidenceSchema = z.object({
+  sameScenarioRetested: z.literal(true),
+  relevantToolAttempted: z.boolean(),
+  policyDecision: PolicyDecisionOutcomeSchema.optional(),
+  toolExecuted: z.boolean(),
+  stateMutationOccurred: z.boolean(),
+  cleanStateReplayConsistent: z.boolean(),
+  retestTraceId: z.string().min(1),
+  replayTraceId: z.string().min(1).optional(),
+});
+export type RemediationAfterEvidence = z.infer<typeof RemediationAfterEvidenceSchema>;
+
+export const RemediationResultSchema = z.object({
+  findingId: z.string().min(1),
+  scenarioId: z.string().min(1),
+  originalSeverity: FindingSeveritySchema,
+  affectedTool: z.string().min(1),
+  currentDisposition: PolicyDispositionSchema,
+  proposedDisposition: PolicyDispositionSchema,
+  retestExecutionId: z.string().min(1),
+  replayExecutionId: z.string().min(1).optional(),
+  blockedDecisionIds: z.array(z.string().min(1)),
+  stateMutationPrevented: z.boolean(),
+  status: RemediationStatusSchema,
+  summary: z.string().min(1),
+  before: RemediationBeforeEvidenceSchema,
+  after: RemediationAfterEvidenceSchema,
+});
+export type RemediationResult = z.infer<typeof RemediationResultSchema>;
+
+export const Stage4HardeningReportSchema = z
+  .object({
+    reportVersion: z.literal("2.0.0"),
+    executionMode: z.literal("DETERMINISTIC_LOCAL_DEMO"),
+    enforcementMode: z.literal("LOCAL_POLICY_SIMULATION"),
+    autonomousAgentExecution: z.literal(false),
+    trueForgeIntegrated: z.literal(false),
+    policyAppliedToTrueForge: z.literal(false),
+    runId: z.string().min(1),
+    generatedAt: z.iso.datetime(),
+    baselineAssessment: DeterministicAssessmentReportSchema,
+    currentPolicy: ToolPolicySchema,
+    proposedPolicy: ToolPolicySchema,
+    policyDiff: z.array(PolicyChangeSchema),
+    policyGenerationProvenance: z.array(PolicyRuleProvenanceSchema).min(1),
+    hardenedExecutions: z.array(ScenarioExecutionSchema),
+    policyDecisions: z.array(PolicyDecisionEvidenceSchema),
+    postHardeningAssessment: DeterministicAssessmentReportSchema,
+    remediationResults: z.array(RemediationResultSchema),
+  })
+  .superRefine((report, context) => {
+    if (report.proposedPolicy.approvalStatus !== "PROPOSED") {
+      context.addIssue({ code: "custom", message: "Stage 4 proposed policies must remain PROPOSED." });
+    }
+    const baselineScenarioIds = report.baselineAssessment.scenarios.map((scenario) => scenario.id).sort();
+    const hardenedScenarioIds = report.postHardeningAssessment.scenarios.map((scenario) => scenario.id).sort();
+    if (JSON.stringify(baselineScenarioIds) !== JSON.stringify(hardenedScenarioIds)) {
+      context.addIssue({ code: "custom", message: "Baseline and hardened assessments must use the same scenarios." });
+    }
+    const remediationIds = new Set(report.remediationResults.map((result) => result.findingId));
+    for (const finding of report.baselineAssessment.verifiedFindings) {
+      if (!remediationIds.has(finding.stableId)) {
+        context.addIssue({ code: "custom", message: `Missing remediation result for ${finding.stableId}.` });
+      }
+    }
+    const hardenedTraceIds = new Set(report.hardenedExecutions.map((execution) => execution.traceId));
+    for (const decision of report.policyDecisions) {
+      if (!hardenedTraceIds.has(decision.traceId)) {
+        context.addIssue({ code: "custom", message: `Policy decision ${decision.id} has no hardened trace.` });
+      }
+    }
+  });
+export type Stage4HardeningReport = z.infer<typeof Stage4HardeningReportSchema>;

@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 
 import { DETERMINISTIC_DEMO_SCENARIOS } from "@mcp-breaker/attack-library";
 import { DEMO_TOOL_METADATA } from "@mcp-breaker/demo-target";
-import { runAssessment } from "@mcp-breaker/evaluation";
+import { runAssessment, runHardeningAssessment } from "@mcp-breaker/evaluation";
 import {
   DeterministicAssessmentReportSchema,
   type DeterministicAssessmentReport,
+  type Stage4HardeningReport,
 } from "@mcp-breaker/shared";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -20,10 +21,16 @@ import { loadAssessment } from "../apps/dashboard/src/lib/assessment-loader.js";
 
 let report: DeterministicAssessmentReport;
 let dashboardHtml: string;
+let hardeningReport: Stage4HardeningReport;
+let hardeningHtml: string;
 
 beforeAll(async () => {
   report = await runAssessment();
   dashboardHtml = renderToStaticMarkup(<SecurityDashboard report={report} />);
+  hardeningReport = await runHardeningAssessment();
+  hardeningHtml = renderToStaticMarkup(
+    <SecurityDashboard report={hardeningReport.baselineAssessment} hardeningReport={hardeningReport} />,
+  );
 });
 
 describe("Stage 3 dashboard rendering", () => {
@@ -117,6 +124,19 @@ describe("Stage 3 dashboard rendering", () => {
     const html = renderToStaticMarkup(<SecurityDashboard report={zeroReport} />);
     expect(html).toContain("No verified findings");
   });
+
+  it("renders measured Stage 4 hardening outcomes without claiming approval or TrueForge application", () => {
+    expect(hardeningHtml).toContain("Before / After Policy Hardening");
+    expect(hardeningHtml).toContain("15<small>/100</small>");
+    expect(hardeningHtml).toContain("100<small>/100</small>");
+    expect(hardeningHtml).toContain("4 remediated");
+    expect(hardeningHtml).toContain("Not approved · Not applied to TrueForge");
+    expect(hardeningHtml).toContain("Finding-by-finding evidence");
+    for (const result of hardeningReport.remediationResults) {
+      expect(hardeningHtml).toContain(result.affectedTool);
+      expect(hardeningHtml).toContain(result.after.retestTraceId);
+    }
+  });
 });
 
 describe("assessment loader states", () => {
@@ -136,6 +156,18 @@ describe("assessment loader states", () => {
     expect(result.status).toBe("invalid");
     if (result.status === "invalid") {
       expect(renderToStaticMarkup(<AssessmentState result={result} />)).toContain("Assessment report invalid");
+    }
+  });
+
+  it("loads a schema-validated Stage 4 artifact and exposes its baseline for the unchanged dashboard", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mcp-breaker-dashboard-hardening-"));
+    const reportPath = join(directory, "hardening.json");
+    await writeFile(reportPath, JSON.stringify(hardeningReport), "utf8");
+    const result = await loadAssessment(reportPath);
+    expect(result.status).toBe("ready");
+    if (result.status === "ready") {
+      expect(result.report.runId).toBe(hardeningReport.baselineAssessment.runId);
+      expect(result.hardeningReport?.runId).toBe(hardeningReport.runId);
     }
   });
 });

@@ -3,16 +3,25 @@ import { resolve } from "node:path";
 
 import {
   DeterministicAssessmentReportSchema,
+  Stage4HardeningReportSchema,
   type DeterministicAssessmentReport,
+  type Stage4HardeningReport,
 } from "@mcp-breaker/shared";
 
 export type AssessmentLoadResult =
-  | { status: "ready"; report: DeterministicAssessmentReport; reportPath: string }
+  | {
+      status: "ready";
+      report: DeterministicAssessmentReport;
+      hardeningReport?: Stage4HardeningReport;
+      reportPath: string;
+    }
   | { status: "missing"; message: string }
   | { status: "invalid"; message: string; reportPath: string };
 
 function defaultReportCandidates(): string[] {
   return [
+    resolve(process.cwd(), "artifacts", "demo-hardening.json"),
+    resolve(process.cwd(), "..", "..", "artifacts", "demo-hardening.json"),
     resolve(process.cwd(), "artifacts", "demo-assessment.json"),
     resolve(process.cwd(), "..", "..", "artifacts", "demo-assessment.json"),
   ];
@@ -45,6 +54,15 @@ export async function loadAssessment(reportPath?: string): Promise<AssessmentLoa
 
   try {
     const parsed: unknown = JSON.parse(raw);
+    const hardeningResult = Stage4HardeningReportSchema.safeParse(parsed);
+    if (hardeningResult.success) {
+      return {
+        status: "ready",
+        report: hardeningResult.data.baselineAssessment,
+        hardeningReport: hardeningResult.data,
+        reportPath: selectedPath,
+      };
+    }
     const result = DeterministicAssessmentReportSchema.safeParse(parsed);
     if (!result.success) {
       return {

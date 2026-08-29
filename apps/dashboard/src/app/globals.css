@@ -308,11 +308,51 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .hardening-list article > div { display: grid; }
 .hardening-list code { color: #e5e5e7; font-size: .78rem; }
 .hardening-list small { color: var(--muted); font-size: .62rem; }
+.hardening-list .hardening-reason { max-width: 680px; margin-top: 5px; color: #a6a6ad; line-height: 1.45; }
 .hardening-list dl { display: grid; grid-template-columns: 1fr 1fr; margin: 0; }
 .hardening-list dl div { padding-left: 14px; border-left: 1px solid var(--line); }
 .hardening-list dt { color: var(--muted); font-size: .62rem; text-transform: uppercase; }
 .hardening-list dd { margin: 2px 0 0; color: #d3d3d7; font-size: .72rem; font-weight: 700; }
 .hardening-list dl div:last-child dd { color: var(--accent); }
+.hardening-truth-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; padding: 11px 14px; border: 1px solid #594b27; border-radius: 4px; background: #17140b; }
+.hardening-truth-banner span { color: var(--medium); font-size: .68rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.hardening-truth-banner strong { color: #d7c88d; font-size: .7rem; }
+.hardening-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; gap: 12px; }
+.hardening-summary article { display: grid; align-content: center; min-height: 132px; padding: 18px; border: 1px solid #4a2931; border-radius: 4px; background: linear-gradient(145deg, rgba(255,100,120,.045), transparent 55%), var(--surface); }
+.hardening-summary article.hardening-after, .hardening-summary article.hardening-proof-count { border-color: #244737; background: linear-gradient(145deg, rgba(117,216,163,.045), transparent 55%), var(--surface); }
+.hardening-summary strong { font-size: 2.2rem; letter-spacing: -.04em; }
+.hardening-summary strong small { margin-left: 3px; color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: 0; }
+.hardening-summary article > span { color: var(--muted); font-size: .7rem; }
+.hardening-summary-arrow { align-self: center; color: #626269; }
+.hardening-subsection { margin-top: 28px; }
+.hardening-subheading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 11px; }
+.hardening-subheading h3 { margin: 3px 0 0; font-size: 1rem; }
+.remediation-list { border: 1px solid var(--line); border-radius: 4px; background: var(--surface); overflow: hidden; }
+.remediation-card { border-bottom: 1px solid var(--line); }
+.remediation-card:last-child { border-bottom: 0; }
+.remediation-card > summary { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(170px, 1fr) 90px auto; align-items: center; gap: 14px; min-height: 54px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.remediation-card > summary::-webkit-details-marker { display: none; }
+.remediation-card > summary:hover { background: var(--surface-raised); }
+.remediation-card > summary > code { color: #e1e1e4; font-size: .75rem; }
+.remediation-card > summary > span:nth-child(3), .remediation-expand { color: var(--muted); font-size: .64rem; text-transform: uppercase; }
+.remediation-expand { text-align: right; }
+.remediation-status { display: inline-flex; align-items: center; gap: 6px; font-size: .66rem; font-weight: 800; }
+.remediation-status-pass { color: var(--pass); }
+.remediation-status-fail { color: var(--critical); }
+.remediation-detail { padding: 14px; border-top: 1px solid var(--line); background: #070708; }
+.remediation-detail > p { margin: 0 0 12px; color: #c8c8cd; font-size: .77rem; }
+.remediation-context { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 9px; }
+.remediation-context > div { min-width: 0; padding: 10px 12px; border: 1px solid var(--line); background: var(--surface); }
+.remediation-context span { color: var(--muted); font-size: .62rem; text-transform: uppercase; }
+.remediation-context p { margin: 4px 0 0; color: #d2d2d6; font-size: .72rem; }
+.remediation-context > div:last-child p { color: #dec48c; font-family: "SFMono-Regular", Consolas, monospace; }
+.remediation-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; border: 1px solid var(--line); background: var(--line); }
+.remediation-compare > div { display: grid; gap: 4px; min-width: 0; padding: 12px; background: var(--surface); }
+.remediation-compare > div:first-child { box-shadow: inset 3px 0 0 var(--critical); }
+.remediation-compare > div:last-child { box-shadow: inset 3px 0 0 var(--pass); }
+.remediation-compare strong { font-size: .77rem; }
+.remediation-compare span { color: var(--muted); font-size: .68rem; }
+.remediation-compare code { overflow-wrap: anywhere; color: #9898a0; font-size: .62rem; }
 .architecture-flow { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
 .architecture-item { position: relative; display: grid; justify-items: center; gap: 9px; padding: 18px 10px; text-align: center; }
 .architecture-item > span { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #3c3c42; border-radius: 3px; background: #131315; color: var(--accent); }
@@ -388,6 +428,14 @@ footer span:first-child { color: #d8d8dc; font-weight: 700; letter-spacing: .06e
   .timeline li:last-child { border-bottom: 0; }
   .hardening-list article { grid-template-columns: auto 1fr; }
   .hardening-list dl { grid-column: 1 / -1; }
+  .hardening-truth-banner { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .hardening-summary { grid-template-columns: 1fr; }
+  .hardening-summary-arrow { justify-self: center; transform: rotate(90deg); }
+  .hardening-subheading { align-items: flex-start; }
+  .remediation-card > summary { grid-template-columns: 1fr auto; }
+  .remediation-card > summary > span:nth-child(3) { display: none; }
+  .remediation-expand { grid-column: 2; grid-row: 1; }
+  .remediation-context, .remediation-compare { grid-template-columns: 1fr; }
   .architecture-flow { grid-template-columns: 1fr; }
   .architecture-item { grid-template-columns: auto 1fr; justify-items: start; align-items: center; text-align: left; }
   .architecture-arrow { display: none; }
