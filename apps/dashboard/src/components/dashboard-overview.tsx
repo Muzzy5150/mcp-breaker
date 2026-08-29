@@ -34,7 +34,7 @@ export function DashboardOverview({ report }: { report: DeterministicAssessmentR
         <div className="assessment-title-row">
           <div>
             <p className="eyebrow">Target</p>
-            <h1 id="assessment-heading">Demo Developer Agent</h1>
+            <h2 id="assessment-heading">Demo Developer Agent</h2>
           </div>
           <span className="status-badge"><CheckCircle2 aria-hidden="true" size={14} /> Completed</span>
         </div>

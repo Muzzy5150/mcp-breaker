@@ -45,6 +45,13 @@ describe("Stage 3 dashboard rendering", () => {
     expect(dashboardHtml).toContain(`>${report.securityAssessment.score}<`);
   });
 
+  it("renders the real assessment inside the adapted product hero", () => {
+    expect(dashboardHtml).toContain("Test every tool call.");
+    expect(dashboardHtml).toContain("Verify every failure.");
+    expect(dashboardHtml).toContain(report.runId);
+    expect(dashboardHtml).toContain("Demo Developer Agent");
+  });
+
   it("renders finding and severity counts from the assessment", () => {
     expect(dashboardHtml).toContain(`${report.verifiedFindings.length} verified`);
     expect(dashboardHtml).toContain(`>${report.securityAssessment.findingCounts.CRITICAL}<`);

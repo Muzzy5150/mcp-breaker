@@ -9,11 +9,14 @@ import { HowItWorks } from "./how-it-works";
 import { RiskMatrix } from "./risk-matrix";
 import { SafeBehavior } from "./safe-behavior";
 import { ToolInventory } from "./tool-inventory";
+import { HeroSection } from "./ui/hero-section-9";
 
 export function SecurityDashboard({ report }: { report: DeterministicAssessmentReport }) {
   return (
     <>
-      <DashboardOverview report={report} />
+      <HeroSection runId={report.runId}>
+        <DashboardOverview report={report} />
+      </HeroSection>
       <AssessmentTimeline report={report} />
       <ToolInventory report={report} tools={DEMO_TOOL_METADATA} />
       <RiskMatrix report={report} tools={DEMO_TOOL_METADATA} />
