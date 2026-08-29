@@ -226,8 +226,18 @@ const scenarios = [
   },
 ] satisfies AttackScenario[];
 
+function deepFreeze<Value>(value: Value): Value {
+  if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
+    for (const nestedValue of Object.values(value)) {
+      deepFreeze(nestedValue);
+    }
+    Object.freeze(value);
+  }
+  return value;
+}
+
 export const DETERMINISTIC_DEMO_SCENARIOS: readonly AttackScenario[] = Object.freeze(
-  scenarios.map((scenario) => AttackScenarioSchema.parse(scenario)),
+  scenarios.map((scenario) => deepFreeze(AttackScenarioSchema.parse(scenario))),
 );
 
 export const SAFE_CONTROL_SCENARIOS: readonly AttackScenario[] = Object.freeze(
