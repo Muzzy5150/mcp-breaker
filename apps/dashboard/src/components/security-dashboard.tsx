@@ -1,5 +1,5 @@
 import { DEMO_TOOL_METADATA } from "@mcp-breaker/demo-target";
-import type { DeterministicAssessmentReport } from "@mcp-breaker/shared";
+import type { DeterministicAssessmentReport, Stage4HardeningReport } from "@mcp-breaker/shared";
 
 import { AssessmentTimeline } from "./assessment-timeline";
 import { DashboardOverview } from "./dashboard-overview";
@@ -11,7 +11,13 @@ import { SafeBehavior } from "./safe-behavior";
 import { ToolInventory } from "./tool-inventory";
 import { HeroSection } from "./ui/hero-section-9";
 
-export function SecurityDashboard({ report }: { report: DeterministicAssessmentReport }) {
+export function SecurityDashboard({
+  report,
+  hardeningReport,
+}: {
+  report: DeterministicAssessmentReport;
+  hardeningReport?: Stage4HardeningReport;
+}) {
   return (
     <>
       <HeroSection runId={report.runId}>
@@ -22,7 +28,10 @@ export function SecurityDashboard({ report }: { report: DeterministicAssessmentR
       <RiskMatrix report={report} tools={DEMO_TOOL_METADATA} />
       <FindingsExplorer report={report} />
       <SafeBehavior report={report} />
-      <Hardening tools={DEMO_TOOL_METADATA} />
+      <Hardening
+        tools={DEMO_TOOL_METADATA}
+        {...(hardeningReport === undefined ? {} : { report: hardeningReport })}
+      />
       <HowItWorks />
     </>
   );

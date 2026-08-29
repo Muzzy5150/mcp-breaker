@@ -61,7 +61,7 @@ A candidate does not become a finding until replay verifies it. Aggregate scores
 
 ## Current implementation boundary
 
-Stages 1 through 3 now implement the deterministic local demo target, evaluation pipeline, and security evidence dashboard. The repository contains an in-memory MCP target, paired safe/unsafe scenario fixtures, an execution-adapter boundary, rule-based evaluation, clean-state replay, evidence-backed finding promotion, verified-finding scoring, policy data/validation, and a schema-validated dashboard. It contains no autonomous attack agent, model client, TrueForge adapter, external integration, or production finding claim.
+Stages 1 through 4 now implement the deterministic local demo target, evaluation pipeline, security evidence dashboard, proposed least-privilege policy generation, local policy enforcement, same-scenario hardened retesting, and before/after remediation evidence. The repository contains an in-memory MCP target, paired safe/unsafe scenario fixtures, an execution-adapter boundary, rule-based evaluation, clean-state replay, evidence-backed finding promotion, verified-finding scoring, policy validation and provenance, pre-execution decision evidence, and schema-validated Stage 2 and Stage 4 reports. It contains no autonomous attack agent, model client, TrueForge adapter, external integration, deployed policy, or production finding claim.
 
 The Stage 2 flow is:
 
@@ -83,6 +83,24 @@ PASS / CANDIDATE_FINDING / INCONCLUSIVE / EXECUTION_ERROR
         validated dashboard report loader
                     ↓
        evidence, replay, and risk views
+```
+
+Stage 4 composes around that unchanged evaluation flow:
+
+```text
+verified baseline findings + demo tool metadata + current policy
+                             ↓
+                 deterministic proposed policy
+                             ↓ validate
+ScenarioRunner → PolicyEnforcedExecutionAdapter → DeterministicExecutionAdapter
+                             ↓
+            policy decisions + hardened executions
+                             ↓
+          unchanged replay, promotion, and scoring
+                             ↓
+       clean-state remediation proof replay per finding
+                             ↓
+             validated before/after report
 ```
 
 The deterministic adapter executes authored test steps and is not an agent runtime. Runtime provenance on a promoted finding means its local tool events and mutations actually occurred; it does not mean an AI autonomously discovered the behavior. Reports retain the deterministic-demo label and link original and replay executions with run, scenario, execution, and trace identifiers.
@@ -109,11 +127,11 @@ Implemented locally: a responsive Next.js dashboard renders the current Stage 2 
 
 ### Stage 4 — deterministic hardening simulation and retest
 
-Model a local approval policy without applying it to external systems, show a before/after policy diff, rerun the verified deterministic scenarios under the proposed policy, and prove whether the same unsafe tool calls are blocked. Preserve the Stage 2 evidence and replay requirements.
+Implemented locally: derive the vulnerable current posture, generate and validate a finding-backed least-privilege proposal, enforce all four dispositions before demo tool execution, preserve attempted-call decision evidence, rerun the exact scenario suite, perform clean-state policy proof replays, and emit a validated before/after report. The dashboard renders the real diff and remediation results while the policy remains visibly proposed and unapplied to TrueForge.
 
 ### Stage 5 — credential-gated TrueForge execution
 
-When credentials and isolated execution are available, implement `TrueForgeExecutionAdapter`, execute the same scenario/evidence contracts through live agent sessions, and compare live results with the deterministic baseline.
+When credentials and isolated execution are available, implement `TrueForgeExecutionAdapter`, execute the same scenario/evidence contracts through live agent sessions, connect genuine approval checkpoints, and compare live results with the deterministic baseline. The Stage 4 local enforcement adapter is evidence-compatible scaffolding, not a substitute for TrueForge behavior.
 
 ### Stage 6 — assessment history and release hardening
 

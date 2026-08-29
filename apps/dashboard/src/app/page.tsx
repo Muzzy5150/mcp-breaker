@@ -28,9 +28,15 @@ export default async function DashboardPage() {
         </div>
       </header>
       <main id="overview" className="dashboard-main">
-        <SecurityDashboard report={result.report} />
+        <SecurityDashboard
+          report={result.report}
+          {...(result.hardeningReport === undefined ? {} : { hardeningReport: result.hardeningReport })}
+        />
       </main>
-      <footer><span>MCP Breaker</span><span>Deterministic evaluation engine · Stage 3</span></footer>
+      <footer>
+        <span>MCP Breaker</span>
+        <span>Deterministic evaluation engine · {result.hardeningReport === undefined ? "Stage 3" : "Stage 4"}</span>
+      </footer>
     </div>
   );
 }

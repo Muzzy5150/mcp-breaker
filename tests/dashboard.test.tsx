@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 
 import { DETERMINISTIC_DEMO_SCENARIOS } from "@mcp-breaker/attack-library";
 import { DEMO_TOOL_METADATA } from "@mcp-breaker/demo-target";
-import { runAssessment } from "@mcp-breaker/evaluation";
+import { runAssessment, runHardeningAssessment } from "@mcp-breaker/evaluation";
 import {
   DeterministicAssessmentReportSchema,
   type DeterministicAssessmentReport,
+  type Stage4HardeningReport,
 } from "@mcp-breaker/shared";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -20,10 +21,16 @@ import { loadAssessment } from "../apps/dashboard/src/lib/assessment-loader.js";
 
 let report: DeterministicAssessmentReport;
 let dashboardHtml: string;
+let hardeningReport: Stage4HardeningReport;
+let hardeningHtml: string;
 
 beforeAll(async () => {
   report = await runAssessment();
   dashboardHtml = renderToStaticMarkup(<SecurityDashboard report={report} />);
+  hardeningReport = await runHardeningAssessment();
+  hardeningHtml = renderToStaticMarkup(
+    <SecurityDashboard report={hardeningReport.baselineAssessment} hardeningReport={hardeningReport} />,
+  );
 });
 
 describe("Stage 3 dashboard rendering", () => {
@@ -182,6 +189,19 @@ describe("Stage 3 dashboard rendering", () => {
     const html = renderToStaticMarkup(<SecurityDashboard report={zeroReport} />);
     expect(html).toContain("No verified findings");
   });
+
+  it("renders measured Stage 4 hardening outcomes without claiming approval or TrueForge application", () => {
+    expect(hardeningHtml).toContain("Before / After Policy Hardening");
+    expect(hardeningHtml).toContain("15<small>/100</small>");
+    expect(hardeningHtml).toContain("100<small>/100</small>");
+    expect(hardeningHtml).toContain("4 remediated");
+    expect(hardeningHtml).toContain("Not approved · Not applied to TrueForge");
+    expect(hardeningHtml).toContain("Finding-by-finding evidence");
+    for (const result of hardeningReport.remediationResults) {
+      expect(hardeningHtml).toContain(result.affectedTool);
+      expect(hardeningHtml).toContain(result.after.retestTraceId);
+    }
+  });
 });
 
 describe("assessment loader states", () => {
@@ -201,6 +221,61 @@ describe("assessment loader states", () => {
     expect(result.status).toBe("invalid");
     if (result.status === "invalid") {
       expect(renderToStaticMarkup(<AssessmentState result={result} />)).toContain("Assessment report invalid");
+    }
+  });
+
+  it("loads a schema-validated Stage 4 artifact and exposes its baseline for the unchanged dashboard", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mcp-breaker-dashboard-hardening-"));
+    const reportPath = join(directory, "hardening.json");
+    await writeFile(reportPath, JSON.stringify(hardeningReport), "utf8");
+    const result = await loadAssessment(reportPath);
+    expect(result.status).toBe("ready");
+    if (result.status === "ready") {
+      expect(result.report.runId).toBe(hardeningReport.baselineAssessment.runId);
+      expect(result.hardeningReport?.runId).toBe(hardeningReport.runId);
+    }
+  });
+
+  it("selects the freshest valid default artifact instead of a stale hardening report", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mcp-breaker-dashboard-freshness-"));
+    const hardeningPath = join(directory, "demo-hardening.json");
+    const assessmentPath = join(directory, "demo-assessment.json");
+    const staleHardening = { ...structuredClone(hardeningReport), generatedAt: "2026-01-01T00:00:00.000Z" };
+    const freshAssessment = {
+      ...structuredClone(report),
+      runId: "assessment-fresh-default",
+      generatedAt: "2026-01-02T00:00:00.000Z",
+    };
+    await writeFile(hardeningPath, JSON.stringify(staleHardening), "utf8");
+    await writeFile(assessmentPath, JSON.stringify(freshAssessment), "utf8");
+
+    const result = await loadAssessment(undefined, { defaultCandidates: [hardeningPath, assessmentPath] });
+
+    expect(result.status).toBe("ready");
+    if (result.status === "ready") {
+      expect(result.report.runId).toBe("assessment-fresh-default");
+      expect(result.hardeningReport).toBeUndefined();
+      expect(result.reportPath).toBe(assessmentPath);
+    }
+  });
+
+  it("falls through malformed and schema-invalid default artifacts to a valid assessment", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "mcp-breaker-dashboard-fallback-"));
+    const malformedPath = join(directory, "malformed-hardening.json");
+    const invalidPath = join(directory, "invalid-hardening.json");
+    const assessmentPath = join(directory, "demo-assessment.json");
+    await writeFile(malformedPath, "{partial", "utf8");
+    await writeFile(invalidPath, JSON.stringify({ reportVersion: "2.0.0" }), "utf8");
+    await writeFile(assessmentPath, JSON.stringify(report), "utf8");
+
+    const result = await loadAssessment(undefined, {
+      defaultCandidates: [malformedPath, invalidPath, assessmentPath],
+    });
+
+    expect(result.status).toBe("ready");
+    if (result.status === "ready") {
+      expect(result.report.runId).toBe(report.runId);
+      expect(result.reportPath).toBe(assessmentPath);
     }
   });
 });
