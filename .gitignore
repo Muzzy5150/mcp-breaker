@@ -4,6 +4,7 @@
 !.env.example
 node_modules/
 dist/
+.next/
 coverage/
 .eslintcache
 *.tsbuildinfo
@@ -12,3 +13,4 @@ coverage/
 *.sqlite-shm
 *.sqlite-wal
 artifacts/demo-assessment.json
+apps/dashboard/next-env.d.ts

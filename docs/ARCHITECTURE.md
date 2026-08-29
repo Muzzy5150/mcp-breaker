@@ -61,7 +61,7 @@ A candidate does not become a finding until replay verifies it. Aggregate scores
 
 ## Current implementation boundary
 
-Stages 1 and 2 now implement the deterministic local demo target and evaluation pipeline. The repository contains an in-memory MCP target, paired safe/unsafe scenario fixtures, an execution-adapter boundary, rule-based evaluation, clean-state replay, evidence-backed finding promotion, verified-finding scoring, and policy data/validation. It contains no autonomous attack agent, model client, TrueForge adapter, external integration, or dashboard finding claim.
+Stages 1 through 3 now implement the deterministic local demo target, evaluation pipeline, and security evidence dashboard. The repository contains an in-memory MCP target, paired safe/unsafe scenario fixtures, an execution-adapter boundary, rule-based evaluation, clean-state replay, evidence-backed finding promotion, verified-finding scoring, policy data/validation, and a schema-validated dashboard. It contains no autonomous attack agent, model client, TrueForge adapter, external integration, or production finding claim.
 
 The Stage 2 flow is:
 
@@ -79,6 +79,10 @@ PASS / CANDIDATE_FINDING / INCONCLUSIVE / EXECUTION_ERROR
                RUNTIME Finding
                     ↓
           verified-finding scoring
+                    ↓
+        validated dashboard report loader
+                    ↓
+       evidence, replay, and risk views
 ```
 
 The deterministic adapter executes authored test steps and is not an agent runtime. Runtime provenance on a promoted finding means its local tool events and mutations actually occurred; it does not mean an AI autonomously discovered the behavior. Reports retain the deterministic-demo label and link original and replay executions with run, scenario, execution, and trace identifiers.
@@ -99,18 +103,18 @@ Implemented locally: deliberately unsafe fixture content, a resettable in-memory
 
 Implemented locally: a non-model runner executes eight authored scenarios (safe and unsafe pairs for four categories), resets and replays demo state, compares observed traces and state with structured expectations, promotes only reproduced candidates, and emits a schema-validated machine-readable assessment. Explicit pass, candidate, inconclusive, execution-error, reproduced, non-reproduced, and replay-error states are represented.
 
-### Stage 3 — initial attack execution
+### Stage 3 — security dashboard and evidence explorer
 
-Implement the four initial attack classes using TrueForge sessions, subagents where useful, and isolated execution. Keep attack inputs deterministic enough for live demonstration and replay.
+Implemented locally: a responsive Next.js dashboard renders the current Stage 2 report, Stage 1 tool metadata, exact tool/category coverage, expandable runtime evidence, distinct replay traces, safe controls, lifecycle counts, and baseline approval recommendations. Missing, invalid, and zero-finding states are explicit. Deterministic-demo labeling prevents autonomous-discovery claims.
 
-### Stage 4 — live verification and scoring
+### Stage 4 — deterministic hardening simulation and retest
 
-Apply the Stage 2 replay and scoring contracts to TrueForge-driven executions. Reset target state, replay candidate successes through the live adapter, promote only reproducible outcomes, and compare live behavior with the deterministic engine baseline.
+Model a local approval policy without applying it to external systems, show a before/after policy diff, rerun the verified deterministic scenarios under the proposed policy, and prove whether the same unsafe tool calls are blocked. Preserve the Stage 2 evidence and replay requirements.
 
-### Stage 5 — remediation and approval
+### Stage 5 — credential-gated TrueForge execution
 
-Generate least-privilege and tool-approval recommendations, present them for human approval, apply only approved demo-policy changes, and rerun verified attacks.
+When credentials and isolated execution are available, implement `TrueForgeExecutionAdapter`, execute the same scenario/evidence contracts through live agent sessions, and compare live results with the deterministic baseline.
 
-### Stage 6 — dashboard and demo hardening
+### Stage 6 — assessment history and release hardening
 
-Present targets, tools, progress, traces, findings, before/after scores, policy approvals, and retest results. Add demo reset/run scripts, failure recovery, documentation, and Qodo-reviewed release readiness.
+Add assessment history, target selection, before/after comparisons, policy approvals, and retest trends to the existing dashboard. Complete failure recovery, release documentation, and Qodo-reviewed readiness.
