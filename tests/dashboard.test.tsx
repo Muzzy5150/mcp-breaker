@@ -60,6 +60,9 @@ describe("Stage 3 dashboard rendering", () => {
   });
 
   it("renders every tool from the Stage 1 metadata source", () => {
+    expect(dashboardHtml).toContain("management-table-shell tool-grid");
+    expect(dashboardHtml).toContain("Observed tool surface");
+    expect(dashboardHtml).toContain("bento-card bento-card-featured score-panel");
     for (const tool of DEMO_TOOL_METADATA) {
       expect(dashboardHtml).toContain(tool.name);
       expect(dashboardHtml).toContain(tool.riskClasses[0]);
