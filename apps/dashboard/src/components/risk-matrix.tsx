@@ -16,7 +16,7 @@ export function RiskMatrix({
       <SectionHeading
         eyebrow="Coverage"
         title="Risk matrix"
-        description="FAIL requires a replay-verified finding for the exact tool and test category."
+        description="FAIL requires a replay-verified finding; PASS requires a completed safe execution for the exact tool and category."
       />
       <div className="table-scroll">
         <table className="risk-matrix" id="matrix-heading">

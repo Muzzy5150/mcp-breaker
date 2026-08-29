@@ -1,4 +1,5 @@
 import {
+  DETERMINISTIC_DEMO_SCENARIOS,
   SAFE_CONTROL_SCENARIOS,
   UNSAFE_DEMO_SCENARIOS,
   getDeterministicDemoScenario,
@@ -13,6 +14,7 @@ import {
 } from "@mcp-breaker/evaluation";
 import {
   DeterministicAssessmentReportSchema,
+  ExecutionTraceSchema,
   type ExecutionTrace,
   type ScriptedToolStep,
 } from "@mcp-breaker/shared";
@@ -89,6 +91,119 @@ describe("Stage 2 deterministic evaluation", () => {
     const execution = await new ScenarioRunner(adapter, clock, ids).runScenario(scenario);
     expect(execution.evaluation.status).toBe("INCONCLUSIVE");
     expect(execution.observedBehavior.stateChanged).toBe(false);
+  });
+
+  it("uses baseline and final snapshots when step-level mutation snapshots are unavailable", async () => {
+    class SnapshotlessTraceAdapter extends DeterministicExecutionAdapter {
+      override async completeExecution(traceId: string): Promise<ExecutionTrace> {
+        const trace = await super.completeExecution(traceId);
+        return ExecutionTraceSchema.parse({
+          ...trace,
+          steps: trace.steps.map((step) => {
+            const snapshotlessStep = structuredClone(step);
+            delete snapshotlessStep.stateBefore;
+            delete snapshotlessStep.stateAfter;
+            return snapshotlessStep;
+          }),
+        });
+      }
+    }
+
+    const clock = new DeterministicClock();
+    const ids = new DeterministicIds();
+    const adapter = new SnapshotlessTraceAdapter(
+      new DemoToolService(new DemoStateStore(() => clock.now()), new TraceRecorder(clock, ids)),
+    );
+    const report = await runAssessment(
+      [getDeterministicDemoScenario("scenario-unauthorized-write-unsafe")],
+      { adapter, clock, ids },
+    );
+
+    expect(report.executions.every((execution) =>
+      execution.trace.steps.every((step) => step.stateBefore === undefined && step.stateAfter === undefined),
+    )).toBe(true);
+    expect(report.counts).toMatchObject({ candidates: 1, reproduced: 1, errors: 0 });
+    expect(report.verifiedFindings).toHaveLength(1);
+  });
+
+  it.each([
+    "RESET",
+    "BASELINE_SNAPSHOT",
+    "BEGIN_EXECUTION",
+    "COMPLETE_EXECUTION",
+    "FINAL_SNAPSHOT",
+  ] as const)("records a %s lifecycle failure and continues the assessment", async (phase) => {
+    class FailingLifecycleAdapter extends DeterministicExecutionAdapter {
+      #failed = false;
+      #executionBegun = false;
+      #executionCompleted = false;
+
+      #failOnce(candidate: typeof phase): void {
+        if (!this.#failed && phase === candidate) {
+          this.#failed = true;
+          throw new Error(`deliberate ${candidate} failure`);
+        }
+      }
+
+      override async reset() {
+        this.#executionBegun = false;
+        this.#executionCompleted = false;
+        this.#failOnce("RESET");
+        return super.reset();
+      }
+
+      override async snapshot() {
+        this.#failOnce(this.#executionCompleted ? "FINAL_SNAPSHOT" : "BASELINE_SNAPSHOT");
+        return super.snapshot();
+      }
+
+      override async beginExecution(correlation: ExecutionCorrelation) {
+        this.#failOnce("BEGIN_EXECUTION");
+        const trace = await super.beginExecution(correlation);
+        this.#executionBegun = true;
+        return trace;
+      }
+
+      override async completeExecution(traceId: string) {
+        expect(this.#executionBegun).toBe(true);
+        this.#failOnce("COMPLETE_EXECUTION");
+        const trace = await super.completeExecution(traceId);
+        this.#executionCompleted = true;
+        return trace;
+      }
+    }
+
+    const clock = new DeterministicClock();
+    const ids = new DeterministicIds();
+    const adapter = new FailingLifecycleAdapter(
+      new DemoToolService(new DemoStateStore(() => clock.now()), new TraceRecorder(clock, ids)),
+    );
+    const report = await runAssessment(
+      [
+        getDeterministicDemoScenario("scenario-indirect-issue-42-safe"),
+        getDeterministicDemoScenario("scenario-unauthorized-write-safe"),
+      ],
+      { adapter, clock, ids },
+    );
+
+    expect(report.counts).toMatchObject({ scenariosExecuted: 2, passes: 1, errors: 1 });
+    expect(report.executionFailures).toMatchObject([
+      { phase, scenarioId: "scenario-indirect-issue-42-safe" },
+    ]);
+    expect(DeterministicAssessmentReportSchema.safeParse(report).success).toBe(true);
+  });
+
+  it("deeply freezes exported deterministic fixtures", () => {
+    const scenario = DETERMINISTIC_DEMO_SCENARIOS[0];
+    const firstStep = scenario?.scriptedSteps[0];
+    expect(Object.isFrozen(DETERMINISTIC_DEMO_SCENARIOS)).toBe(true);
+    expect(Object.isFrozen(scenario)).toBe(true);
+    expect(Object.isFrozen(scenario?.expectedBehavior)).toBe(true);
+    expect(Object.isFrozen(scenario?.scriptedSteps)).toBe(true);
+    expect(Object.isFrozen(firstStep)).toBe(true);
+    expect(Object.isFrozen(firstStep?.arguments)).toBe(true);
+    expect(Reflect.set(firstStep?.arguments as object, "mutated", true)).toBe(false);
+    expect(firstStep?.arguments).not.toHaveProperty("mutated");
   });
 
   it("replays candidates with distinct linked traces, promotes only reproduced evidence, and scores it", async () => {

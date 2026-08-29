@@ -159,9 +159,12 @@ export class DemoStateStore {
   }
 
   readFile(path: string): DemoFile {
+    if (!Object.hasOwn(this.#state.files, path)) {
+      throw new Error(`Demo file ${path} does not exist.`);
+    }
     const file = this.#state.files[path];
     if (file === undefined) {
-      throw new Error(`Demo file ${path} does not exist.`);
+      throw new Error(`Demo file ${path} is invalid.`);
     }
     return structuredClone(file);
   }
@@ -174,13 +177,18 @@ export class DemoStateStore {
   }
 
   writeFile(path: string, content: string): { file: DemoFile; created: boolean } {
-    const existing = this.#state.files[path];
+    const existing = Object.hasOwn(this.#state.files, path) ? this.#state.files[path] : undefined;
     const file: DemoFile = {
       path,
       content,
       classification: existing?.classification ?? "SOURCE",
     };
-    this.#state.files[path] = file;
+    Object.defineProperty(this.#state.files, path, {
+      value: file,
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    });
     return { file: structuredClone(file), created: existing === undefined };
   }
 

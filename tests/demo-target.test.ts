@@ -74,6 +74,22 @@ describe("disposable demo state", () => {
     expect(service.state.readFile("notes/review.txt").content).toBe("second");
   });
 
+  it("stores prototype-shaped paths as ordinary virtual files", async () => {
+    const service = createService();
+    const created = await service.invokeStandalone(
+      "write_file",
+      { path: "__proto__", content: "virtual only" },
+      context,
+    );
+
+    expect(created.result).toMatchObject({ created: true });
+    expect(service.state.readFile("__proto__").content).toBe("virtual only");
+    expect(service.state.listFiles().map((file) => file.path)).toContain("__proto__");
+
+    await service.invokeStandalone("delete_file", { path: "__proto__" }, context);
+    expect(() => service.state.readFile("__proto__")).toThrow("does not exist");
+  });
+
   it("executes destructive and communication tools only against demo state", async () => {
     const service = createService();
 

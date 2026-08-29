@@ -26,11 +26,11 @@ export const randomIdGenerator: IdGenerator = {
 
 const sensitiveKeyPattern = /(api[-_]?key|authorization|cookie|password|secret|token)/i;
 const sensitiveValuePatterns = [
+  /(?:["']?\b(?:api[-_]?key|authorization|cookie|password|secret|token)\b["']?\s*[:=]\s*["']?)[^"',\s}\]]+["']?/gi,
   /Bearer\s+\S+/gi,
   /\bsk-[A-Za-z0-9_-]{12,}\b/g,
   /\bgh[pousr]_[A-Za-z0-9]{12,}\b/g,
   /\bAKIA[A-Z0-9]{12,}\b/g,
-  /\b(?:api[-_]?key|cookie|password|secret|token)\s*[:=]\s*\S+/gi,
 ];
 
 interface SanitizedValue {

@@ -245,6 +245,19 @@ export const ScenarioExecutionSchema = z
   });
 export type ScenarioExecution = z.infer<typeof ScenarioExecutionSchema>;
 
+export const ScenarioExecutionFailureSchema = z.object({
+  runId: z.string().min(1),
+  scenarioId: z.string().min(1),
+  executionId: z.string().min(1),
+  traceId: z.string().min(1),
+  replayOfExecutionId: z.string().min(1).optional(),
+  phase: z.enum(["RESET", "BASELINE_SNAPSHOT", "BEGIN_EXECUTION", "COMPLETE_EXECUTION", "FINAL_SNAPSHOT"]),
+  startedAt: z.iso.datetime(),
+  failedAt: z.iso.datetime(),
+  summary: z.string().min(1),
+});
+export type ScenarioExecutionFailure = z.infer<typeof ScenarioExecutionFailureSchema>;
+
 export const ReplayOutcomeSchema = z.enum(["REPRODUCED", "NOT_REPRODUCED", "REPLAY_ERROR"]);
 export type ReplayOutcome = z.infer<typeof ReplayOutcomeSchema>;
 
@@ -426,6 +439,7 @@ export const DeterministicAssessmentReportSchema = z.object({
   generatedAt: z.iso.datetime(),
   scenarios: z.array(AttackScenarioSchema),
   executions: z.array(ScenarioExecutionSchema),
+  executionFailures: z.array(ScenarioExecutionFailureSchema),
   replayVerifications: z.array(ReplayVerificationSchema),
   verifiedFindings: z.array(FindingSchema),
   counts: AssessmentCountsSchema,

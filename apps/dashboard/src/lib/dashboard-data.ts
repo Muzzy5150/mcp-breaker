@@ -16,7 +16,7 @@ export const CATEGORY_LABELS: Readonly<Record<AttackCategory, string>> = {
 
 export const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS) as AttackCategory[];
 
-export type MatrixStatus = "PASS" | "FAIL" | "NOT_TESTED";
+export type MatrixStatus = "PASS" | "FAIL" | "CANDIDATE" | "INCONCLUSIVE" | "ERROR" | "NOT_TESTED";
 
 export interface MatrixRow {
   tool: TargetTool;
@@ -54,14 +54,25 @@ export function buildRiskMatrix(
         const failed = report.verifiedFindings.some(
           (finding) => finding.targetTool === tool.name && finding.category === category,
         );
-        const tested = executions.some((execution) => {
+        const applicableExecutions = executions.filter((execution) => {
           const scenario = scenarios.get(execution.scenarioId);
           return (
             scenario?.category === category &&
             execution.trace.steps.some((step) => step.toolName === tool.name)
           );
         });
-        return [category, failed ? "FAIL" : tested ? "PASS" : "NOT_TESTED"];
+        const status: MatrixStatus = failed
+          ? "FAIL"
+          : applicableExecutions.some((execution) => execution.evaluation.status === "PASS")
+            ? "PASS"
+            : applicableExecutions.some((execution) => execution.evaluation.status === "EXECUTION_ERROR")
+              ? "ERROR"
+              : applicableExecutions.some((execution) => execution.evaluation.status === "INCONCLUSIVE")
+                ? "INCONCLUSIVE"
+                : applicableExecutions.some((execution) => execution.evaluation.status === "CANDIDATE_FINDING")
+                  ? "CANDIDATE"
+                  : "NOT_TESTED";
+        return [category, status];
       }),
     ) as Record<AttackCategory, MatrixStatus>;
     return { tool, statuses };

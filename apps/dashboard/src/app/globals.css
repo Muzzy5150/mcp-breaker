@@ -218,6 +218,9 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .matrix-status { display: inline-flex; min-width: 78px; justify-content: center; padding: 3px 7px; border: 1px solid var(--line); border-radius: 4px; font-size: .61rem; font-weight: 800; letter-spacing: .04em; }
 .matrix-fail { border-color: #703342; background: #241119; color: var(--critical); }
 .matrix-pass { border-color: #285d46; background: #0b2119; color: var(--pass); }
+.matrix-error { border-color: #703342; background: #241119; color: var(--critical); }
+.matrix-candidate { border-color: #70452f; background: #21150f; color: var(--high); }
+.matrix-inconclusive { border-color: #6a5c2c; background: #1c190d; color: var(--medium); }
 .matrix-not-tested { color: #777780; background: #09090a; }
 .finding-card { border-bottom: 1px solid var(--line); background: var(--surface); overflow: clip; }
 .management-table-rows > .finding-card:last-child { border-bottom: 0; }
@@ -285,9 +288,12 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .empty-panel p { margin: 0; color: var(--muted); }
 .safe-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .safe-card { border: 1px solid #203d33; border-radius: 8px; background: #0a1310; padding: 16px; }
+.safe-card-nonpass { border-color: #514825; background: #141209; }
 .safe-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .safe-card-top > span { color: var(--muted); font-size: .68rem; text-transform: uppercase; }
-.safe-card-top strong { display: inline-flex; align-items: center; gap: 4px; color: var(--pass); font-size: .68rem; }
+.safe-card-top strong { display: inline-flex; align-items: center; gap: 4px; font-size: .68rem; }
+.safe-status-pass { color: var(--pass); }
+.safe-status-nonpass { color: var(--medium); }
 .safe-card h3 { margin: 12px 0; font-size: .94rem; }
 .safe-card dl { display: grid; gap: 9px; margin: 0; }
 .safe-card dl div { padding-top: 9px; border-top: 1px solid #1a3028; }
