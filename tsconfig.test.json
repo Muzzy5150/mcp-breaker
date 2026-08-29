@@ -2,10 +2,14 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "types": ["node", "vitest/globals"],
+    "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "declaration": false,
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["tests/**/*.ts"]
+  "include": ["tests/**/*.ts", "tests/**/*.tsx"]
 }
