@@ -14,6 +14,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { AssessmentState } from "../apps/dashboard/src/components/assessment-state.js";
 import { SecurityDashboard } from "../apps/dashboard/src/components/security-dashboard.js";
+import { NeonRGBTextEffect } from "../apps/dashboard/src/components/ui/neon-rgbtext-effect.js";
 import { buildRiskMatrix } from "../apps/dashboard/src/lib/dashboard-data.js";
 import { loadAssessment } from "../apps/dashboard/src/lib/assessment-loader.js";
 
@@ -26,6 +27,13 @@ beforeAll(async () => {
 });
 
 describe("Stage 3 dashboard rendering", () => {
+  it("renders reusable MCP branding with an accessible text fallback", () => {
+    const html = renderToStaticMarkup(<NeonRGBTextEffect text="MCP BREAKER" />);
+    expect(html).toContain("MCP BREAKER");
+    expect(html).toContain("neon-rgb-text-fallback");
+    expect(html).toContain("aria-hidden=\"true\"");
+  });
+
   it("renders a schema-validated Stage 2 assessment and its actual score", async () => {
     const directory = await mkdtemp(join(tmpdir(), "mcp-breaker-dashboard-valid-"));
     const reportPath = join(directory, "assessment.json");

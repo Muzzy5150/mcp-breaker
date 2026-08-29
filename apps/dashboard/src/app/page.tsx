@@ -1,7 +1,6 @@
-import { ShieldCheck } from "lucide-react";
-
 import { AssessmentState } from "@/components/assessment-state";
 import { SecurityDashboard } from "@/components/security-dashboard";
+import { NeonRGBTextEffect } from "@/components/ui/neon-rgbtext-effect";
 import { loadAssessment } from "@/lib/assessment-loader";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +15,8 @@ export default async function DashboardPage() {
     <div className="app-shell">
       <header className="topbar">
         <a className="brand" href="#overview" aria-label="MCP Breaker overview">
-          <span className="brand-mark"><ShieldCheck aria-hidden="true" size={18} /></span>
-          <span>MCP BREAKER</span>
+          <NeonRGBTextEffect text="MCP BREAKER" className="brand-effect" />
+          <span className="brand-subtitle">Security evidence</span>
         </a>
         <nav aria-label="Dashboard sections">
           <a href="#tools">Tools</a>
@@ -25,7 +24,7 @@ export default async function DashboardPage() {
           <a href="#safe-behavior">Safe behavior</a>
           <a href="#hardening">Hardening</a>
         </nav>
-        <span className="demo-label">Deterministic local demo</span>
+        <span className="demo-label"><span aria-hidden="true" />Deterministic local demo</span>
       </header>
       <main id="overview" className="dashboard-main">
         <div className="intro-row">
