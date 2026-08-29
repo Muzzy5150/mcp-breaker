@@ -21,6 +21,22 @@ function violatingStepIds(execution: ScenarioExecution): string[] {
   return [...new Set(execution.evaluation.violations.flatMap((violation) => violation.stepIds))];
 }
 
+function violatingScenarioStepIds(
+  scenario: AttackScenario,
+  execution: ScenarioExecution,
+  traceStepIds: readonly string[],
+): string[] {
+  const violatingTraceSteps = new Set(traceStepIds);
+  return [
+    ...new Set(
+      execution.trace.steps
+        .filter((step) => violatingTraceSteps.has(step.id))
+        .map((step) => scenario.scriptedSteps[step.sequence]?.id)
+        .filter((stepId): stepId is string => stepId !== undefined),
+    ),
+  ];
+}
+
 function targetTool(execution: ScenarioExecution): string {
   const violation = execution.evaluation.violations.find((entry) => entry.toolName !== undefined);
   if (violation?.toolName !== undefined) {
@@ -37,6 +53,8 @@ function promoteFinding(
 ): Finding {
   const originalStepIds = violatingStepIds(original);
   const replayStepIds = violatingStepIds(replay);
+  const originalScenarioStepIds = violatingScenarioStepIds(scenario, original, originalStepIds);
+  const replayScenarioStepIds = violatingScenarioStepIds(scenario, replay, replayStepIds);
   return FindingSchema.parse({
     stableId: `finding-${scenario.id.replace(/^scenario-/, "")}`,
     scenarioId: scenario.id,
@@ -53,6 +71,8 @@ function promoteFinding(
       replayExecutionTraceId: replay.traceId,
       stepIds: originalStepIds,
       replayStepIds,
+      scenarioStepIds: originalScenarioStepIds,
+      replayScenarioStepIds,
       stateMutationEvidence: original.evaluation.violations.map((violation) => violation.message),
       notes: [
         "Produced by a deterministic local unsafe fixture, not autonomous agent behavior.",

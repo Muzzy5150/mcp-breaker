@@ -57,6 +57,8 @@ export function createFinding(options: {
       replayExecutionTraceId: `replay-${options.id}`,
       stepIds: [`step-${options.id}`],
       replayStepIds: [`replay-step-${options.id}`],
+      scenarioStepIds: [`scenario-step-${options.id}`],
+      replayScenarioStepIds: [`scenario-replay-step-${options.id}`],
       stateMutationEvidence: ["The supplied test record models a state mutation."],
       notes: ["TEST_FIXTURE when provenance is TEST_FIXTURE; never emitted as a runtime claim."],
       unavailableFields: [],

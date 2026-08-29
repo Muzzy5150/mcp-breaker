@@ -41,13 +41,18 @@ function originalExecution(executions: readonly ScenarioExecution[], scenarioId:
   );
 }
 
-function decisionsFor(
+export function decisionsForFinding(
   decisions: readonly PolicyDecisionEvidence[],
   executionId: string,
   toolName: string,
+  violatingStepIds: readonly string[],
 ): PolicyDecisionEvidence[] {
+  const relevantSteps = new Set(violatingStepIds);
   return decisions.filter(
-    (decision) => decision.executionId === executionId && decision.toolName === toolName,
+    (decision) =>
+      decision.executionId === executionId &&
+      decision.toolName === toolName &&
+      relevantSteps.has(decision.stepId),
   );
 }
 
@@ -63,8 +68,18 @@ function remediationResult(input: {
   if (policyChange === undefined) {
     throw new Error(`Missing policy provenance for ${input.finding.targetTool}.`);
   }
-  const retestDecisions = decisionsFor(input.decisions, input.retest.executionId, input.finding.targetTool);
-  const replayDecisions = decisionsFor(input.decisions, input.replay.executionId, input.finding.targetTool);
+  const retestDecisions = decisionsForFinding(
+    input.decisions,
+    input.retest.executionId,
+    input.finding.targetTool,
+    input.finding.evidence.scenarioStepIds ?? [],
+  );
+  const replayDecisions = decisionsForFinding(
+    input.decisions,
+    input.replay.executionId,
+    input.finding.targetTool,
+    input.finding.evidence.replayScenarioStepIds ?? [],
+  );
   const retestDecision = retestDecisions[0];
   const replayDecision = replayDecisions[0];
   const blockedDecisions = [...retestDecisions, ...replayDecisions].filter((decision) => !decision.executed);

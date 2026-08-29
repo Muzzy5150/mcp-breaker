@@ -69,6 +69,11 @@ function HardeningResults({ report }: { report: Stage4HardeningReport }) {
                 <code>{change.toolName}</code>
                 <small>{change.riskClasses.join(" / ")}</small>
                 <small className="hardening-reason">{change.reason}</small>
+                {JSON.stringify(change.currentAllowedContexts) !== JSON.stringify(change.proposedAllowedContexts) ? (
+                  <small className="hardening-reason">
+                    Contexts: {change.currentAllowedContexts.join("; ") || "none"} → {change.proposedAllowedContexts.join("; ") || "none"}
+                  </small>
+                ) : null}
               </div>
               <dl>
                 <div><dt>Current</dt><dd>{change.currentDisposition}</dd></div>

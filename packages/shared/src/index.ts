@@ -368,6 +368,8 @@ export const FindingEvidenceSchema = z.object({
   replayExecutionTraceId: z.string().min(1),
   stepIds: z.array(z.string().min(1)).min(1),
   replayStepIds: z.array(z.string().min(1)).min(1),
+  scenarioStepIds: z.array(z.string().min(1)).min(1).optional(),
+  replayScenarioStepIds: z.array(z.string().min(1)).min(1).optional(),
   stateMutationEvidence: z.array(z.string().min(1)).min(1),
   notes: z.array(z.string().min(1)),
   unavailableFields: z.array(z.string().min(1)),
@@ -492,6 +494,8 @@ export const PolicyRuleProvenanceSchema = z.object({
   toolName: z.string().min(1),
   currentDisposition: PolicyDispositionSchema,
   proposedDisposition: PolicyDispositionSchema,
+  currentAllowedContexts: z.array(z.string().min(1)),
+  proposedAllowedContexts: z.array(z.string().min(1)),
   reason: z.string().min(1),
   relatedFindingIds: z.array(z.string().min(1)),
   riskClasses: z.array(ToolRiskSchema).min(1),
@@ -534,22 +538,60 @@ export const RemediationAfterEvidenceSchema = z.object({
 });
 export type RemediationAfterEvidence = z.infer<typeof RemediationAfterEvidenceSchema>;
 
-export const RemediationResultSchema = z.object({
-  findingId: z.string().min(1),
-  scenarioId: z.string().min(1),
-  originalSeverity: FindingSeveritySchema,
-  affectedTool: z.string().min(1),
-  currentDisposition: PolicyDispositionSchema,
-  proposedDisposition: PolicyDispositionSchema,
-  retestExecutionId: z.string().min(1),
-  replayExecutionId: z.string().min(1).optional(),
-  blockedDecisionIds: z.array(z.string().min(1)),
-  stateMutationPrevented: z.boolean(),
-  status: RemediationStatusSchema,
-  summary: z.string().min(1),
-  before: RemediationBeforeEvidenceSchema,
-  after: RemediationAfterEvidenceSchema,
-});
+export const RemediationResultSchema = z
+  .object({
+    findingId: z.string().min(1),
+    scenarioId: z.string().min(1),
+    originalSeverity: FindingSeveritySchema,
+    affectedTool: z.string().min(1),
+    currentDisposition: PolicyDispositionSchema,
+    proposedDisposition: PolicyDispositionSchema,
+    retestExecutionId: z.string().min(1),
+    replayExecutionId: z.string().min(1).optional(),
+    blockedDecisionIds: z.array(z.string().min(1)),
+    stateMutationPrevented: z.boolean(),
+    status: RemediationStatusSchema,
+    summary: z.string().min(1),
+    before: RemediationBeforeEvidenceSchema,
+    after: RemediationAfterEvidenceSchema,
+  })
+  .superRefine((result, context) => {
+    if (result.stateMutationPrevented === result.after.stateMutationOccurred) {
+      context.addIssue({
+        code: "custom",
+        message: "stateMutationPrevented must be the inverse of the observed post-hardening mutation state.",
+      });
+    }
+    if (result.after.relevantToolAttempted !== (result.after.policyDecision !== undefined)) {
+      context.addIssue({
+        code: "custom",
+        message: "A relevant tool attempt and its policy decision must be recorded together.",
+      });
+    }
+    if (result.after.toolExecuted && result.after.policyDecision !== "ALLOWED") {
+      context.addIssue({ code: "custom", message: "An executed remediation attempt must have an ALLOWED decision." });
+    }
+    if (result.status === "REMEDIATED") {
+      const blockingDecision =
+        result.after.policyDecision !== undefined && result.after.policyDecision !== "ALLOWED";
+      if (
+        !result.after.relevantToolAttempted ||
+        !blockingDecision ||
+        result.after.toolExecuted ||
+        result.after.stateMutationOccurred ||
+        !result.stateMutationPrevented ||
+        !result.after.cleanStateReplayConsistent ||
+        result.replayExecutionId === undefined ||
+        result.after.replayTraceId === undefined ||
+        result.blockedDecisionIds.length < 2
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "REMEDIATED status requires two consistent blocked attempts with no execution or mutation.",
+        });
+      }
+    }
+  });
 export type RemediationResult = z.infer<typeof RemediationResultSchema>;
 
 export const Stage4HardeningReportSchema = z
@@ -586,11 +628,56 @@ export const Stage4HardeningReportSchema = z
       if (!remediationIds.has(finding.stableId)) {
         context.addIssue({ code: "custom", message: `Missing remediation result for ${finding.stableId}.` });
       }
+      if (finding.evidence.scenarioStepIds === undefined || finding.evidence.replayScenarioStepIds === undefined) {
+        context.addIssue({
+          code: "custom",
+          message: `Stage 4 finding ${finding.stableId} is missing authored scenario-step correlation.`,
+        });
+      }
     }
     const hardenedTraceIds = new Set(report.hardenedExecutions.map((execution) => execution.traceId));
     for (const decision of report.policyDecisions) {
       if (!hardenedTraceIds.has(decision.traceId)) {
         context.addIssue({ code: "custom", message: `Policy decision ${decision.id} has no hardened trace.` });
+      }
+    }
+    const findingsById = new Map(
+      report.baselineAssessment.verifiedFindings.map((finding) => [finding.stableId, finding]),
+    );
+    const decisionsById = new Map(report.policyDecisions.map((decision) => [decision.id, decision]));
+    for (const result of report.remediationResults) {
+      const finding = findingsById.get(result.findingId);
+      if (finding === undefined) {
+        context.addIssue({ code: "custom", message: `Remediation result ${result.findingId} has no baseline finding.` });
+        continue;
+      }
+      const retestSteps = new Set(finding.evidence.scenarioStepIds ?? []);
+      const replaySteps = new Set(finding.evidence.replayScenarioStepIds ?? []);
+      let hasRetestBlock = false;
+      let hasReplayBlock = false;
+      for (const decisionId of result.blockedDecisionIds) {
+        const decision = decisionsById.get(decisionId);
+        if (
+          decision === undefined ||
+          decision.executed ||
+          decision.scenarioId !== result.scenarioId ||
+          decision.toolName !== result.affectedTool
+        ) {
+          context.addIssue({ code: "custom", message: `Blocked decision ${decisionId} is missing or inconsistent.` });
+          continue;
+        }
+        if (decision.executionId === result.retestExecutionId && retestSteps.has(decision.stepId)) {
+          hasRetestBlock = true;
+        }
+        if (decision.executionId === result.replayExecutionId && replaySteps.has(decision.stepId)) {
+          hasReplayBlock = true;
+        }
+      }
+      if (result.status === "REMEDIATED" && (!hasRetestBlock || !hasReplayBlock)) {
+        context.addIssue({
+          code: "custom",
+          message: `REMEDIATED result ${result.findingId} lacks correlated retest and replay blocks.`,
+        });
       }
     }
   });

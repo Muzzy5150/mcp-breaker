@@ -27,6 +27,10 @@ function effectiveDisposition(policy: ToolPolicy, toolName: string): PolicyDispo
   return explicitRule(policy, toolName)?.disposition ?? policy.defaultDisposition;
 }
 
+function effectiveAllowedContexts(policy: ToolPolicy, toolName: string): string[] {
+  return explicitRule(policy, toolName)?.allowedContexts ?? [];
+}
+
 function assertValidPolicy(input: unknown, tools: readonly TargetTool[], label: string): ToolPolicy {
   const validation = validateToolPolicy(input, [...tools]);
   if (!validation.valid || validation.policy === undefined) {
@@ -103,15 +107,20 @@ export function describePolicyProvenance(input: {
     const related = input.findings.filter((finding) => finding.targetTool === tool.name);
     const current = effectiveDisposition(input.currentPolicy, tool.name);
     const proposed = effectiveDisposition(input.proposedPolicy, tool.name);
+    const currentAllowedContexts = effectiveAllowedContexts(input.currentPolicy, tool.name);
+    const proposedAllowedContexts = effectiveAllowedContexts(input.proposedPolicy, tool.name);
     const proposedRule = explicitRule(input.proposedPolicy, tool.name);
     return PolicyRuleProvenanceSchema.parse({
       toolName: tool.name,
       currentDisposition: current,
       proposedDisposition: proposed,
+      currentAllowedContexts,
+      proposedAllowedContexts,
       reason: proposedRule?.rationale ?? rationaleFor(tool, related, proposed),
       relatedFindingIds: related.map((finding) => finding.stableId),
       riskClasses: tool.riskClasses,
-      changed: current !== proposed,
+      changed:
+        current !== proposed || JSON.stringify(currentAllowedContexts) !== JSON.stringify(proposedAllowedContexts),
     });
   });
 }

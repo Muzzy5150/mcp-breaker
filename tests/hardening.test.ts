@@ -14,10 +14,15 @@ import {
   DeterministicExecutionAdapter,
   PolicyEnforcedExecutionAdapter,
   ScenarioRunner,
+  decisionsForFinding,
   runAssessment,
   runHardeningAssessment,
 } from "@mcp-breaker/evaluation";
-import { Stage4HardeningReportSchema, type ToolPolicy } from "@mcp-breaker/shared";
+import {
+  RemediationResultSchema,
+  Stage4HardeningReportSchema,
+  type ToolPolicy,
+} from "@mcp-breaker/shared";
 import { describe, expect, it } from "vitest";
 
 import { DeterministicClock, DeterministicIds } from "./helpers.js";
@@ -94,6 +99,38 @@ describe("Stage 4 policy generation", () => {
     expect(() => new PolicyEnforcedExecutionAdapter(new DeterministicExecutionAdapter(), malformed, DEMO_TOOL_METADATA)).toThrow(
       /invalid/i,
     );
+  });
+
+  it("reports context-only policy changes with before-and-after context provenance", async () => {
+    const baselineHarness = deterministicHarness();
+    const baseline = await runAssessment(undefined, baselineHarness);
+    const current = deriveCurrentDemoPolicy(DEMO_TOOL_METADATA);
+    const generated = generateRemediationPolicy({
+      currentPolicy: current,
+      findings: baseline.verifiedFindings,
+      tools: DEMO_TOOL_METADATA,
+    });
+    const proposedPolicyOverride: ToolPolicy = {
+      ...structuredClone(generated.proposedPolicy),
+      rules: generated.proposedPolicy.rules.map((rule) =>
+        rule.toolName === "read_issue"
+          ? { ...rule, allowedContexts: ["Only issue #42 may be inspected."], rationale: "Narrow test context." }
+          : rule,
+      ),
+    };
+    const report = await runHardeningAssessment(undefined, {
+      ...deterministicHarness(),
+      proposedPolicyOverride,
+    });
+    const change = report.policyDiff.find((entry) => entry.toolName === "read_issue");
+
+    expect(change).toMatchObject({
+      currentDisposition: "ALLOW",
+      proposedDisposition: "ALLOW",
+      currentAllowedContexts: current.rules.find((rule) => rule.toolName === "read_issue")?.allowedContexts,
+      proposedAllowedContexts: ["Only issue #42 may be inspected."],
+      changed: true,
+    });
   });
 });
 
@@ -240,6 +277,69 @@ describe("Stage 4 hardened retest", () => {
     }
     expect(report.trueForgeIntegrated).toBe(false);
     expect(report.policyAppliedToTrueForge).toBe(false);
+  });
+
+  it("correlates remediation decisions to the finding's violating step IDs", async () => {
+    const report = await runHardeningAssessment(DETERMINISTIC_DEMO_SCENARIOS, deterministicHarness());
+    const finding = report.baselineAssessment.verifiedFindings[0];
+    const relevant = report.policyDecisions.find(
+      (decision) =>
+        decision.toolName === finding?.targetTool &&
+        finding.evidence.scenarioStepIds?.includes(decision.stepId),
+    );
+    expect(finding).toBeDefined();
+    expect(relevant).toBeDefined();
+    if (finding === undefined || relevant === undefined) {
+      return;
+    }
+    const unrelated = {
+      ...relevant,
+      id: "policy-decision-unrelated-safe-step",
+      stepId: "step-unrelated-safe-call",
+      decision: "ALLOWED" as const,
+      executed: true,
+    };
+
+    expect(
+      decisionsForFinding(
+        [unrelated, relevant],
+        relevant.executionId,
+        finding.targetTool,
+        finding.evidence.scenarioStepIds ?? [],
+      ),
+    ).toEqual([relevant]);
+  });
+
+  it("rejects a REMEDIATED result that contradicts its execution evidence", async () => {
+    const report = await runHardeningAssessment(DETERMINISTIC_DEMO_SCENARIOS, deterministicHarness());
+    const result = report.remediationResults[0];
+    expect(result).toBeDefined();
+    if (result === undefined) {
+      return;
+    }
+
+    expect(
+      RemediationResultSchema.safeParse({
+        ...result,
+        status: "REMEDIATED",
+        stateMutationPrevented: false,
+        after: {
+          ...result.after,
+          policyDecision: "ALLOWED",
+          toolExecuted: true,
+          stateMutationOccurred: true,
+        },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      Stage4HardeningReportSchema.safeParse({
+        ...report,
+        remediationResults: report.remediationResults.map((entry, index) =>
+          index === 0 ? { ...entry, blockedDecisionIds: ["missing-retest", "missing-replay"] } : entry,
+        ),
+      }).success,
+    ).toBe(false);
   });
 
   it("reports NOT_REMEDIATED when a supplied policy leaves a reproduced unsafe tool allowed", async () => {
