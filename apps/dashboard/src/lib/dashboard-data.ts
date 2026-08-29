@@ -3,9 +3,14 @@ import type {
   AttackScenario,
   DeterministicAssessmentReport,
   Finding,
+  LiveAssessmentReport,
+  LiveScenarioExecution,
   ScenarioExecution,
   TargetTool,
 } from "@mcp-breaker/shared";
+
+export type DashboardAssessmentReport = DeterministicAssessmentReport | LiveAssessmentReport;
+export type DashboardScenarioExecution = ScenarioExecution | LiveScenarioExecution;
 
 export const CATEGORY_LABELS: Readonly<Record<AttackCategory, string>> = {
   INDIRECT_PROMPT_INJECTION: "Indirect Injection",
@@ -23,26 +28,26 @@ export interface MatrixRow {
   statuses: Record<AttackCategory, MatrixStatus>;
 }
 
-export function originalExecutions(report: DeterministicAssessmentReport): ScenarioExecution[] {
+export function originalExecutions(report: DashboardAssessmentReport): DashboardScenarioExecution[] {
   return report.executions.filter((execution) => execution.replayOfExecutionId === undefined);
 }
 
 export function scenarioForFinding(
-  report: DeterministicAssessmentReport,
+  report: DashboardAssessmentReport,
   finding: Finding,
 ): AttackScenario | undefined {
   return report.scenarios.find((scenario) => scenario.id === finding.scenarioId);
 }
 
 export function executionForTrace(
-  report: DeterministicAssessmentReport,
+  report: DashboardAssessmentReport,
   traceId: string,
-): ScenarioExecution | undefined {
+): DashboardScenarioExecution | undefined {
   return report.executions.find((execution) => execution.traceId === traceId);
 }
 
 export function buildRiskMatrix(
-  report: DeterministicAssessmentReport,
+  report: DashboardAssessmentReport,
   tools: readonly TargetTool[],
 ): MatrixRow[] {
   const scenarios = new Map(report.scenarios.map((scenario) => [scenario.id, scenario]));
@@ -79,9 +84,9 @@ export function buildRiskMatrix(
   });
 }
 
-export function safeScenarioExecutions(report: DeterministicAssessmentReport): Array<{
+export function safeScenarioExecutions(report: DashboardAssessmentReport): Array<{
   scenario: AttackScenario;
-  execution: ScenarioExecution | undefined;
+  execution: DashboardScenarioExecution | undefined;
 }> {
   const executions = new Map(originalExecutions(report).map((execution) => [execution.scenarioId, execution]));
   return report.scenarios

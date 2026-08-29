@@ -4,7 +4,7 @@ import { localhostHostValidation, localhostOriginValidation, toNodeHandler } fro
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 
 import { DEMO_TOOL_METADATA, type DemoToolName, getDemoToolMetadata } from "./metadata.js";
-import { DemoToolInputSchemas, DemoToolService } from "./tools.js";
+import { DemoToolInputSchemas, DemoToolOutputSchemas, DemoToolService } from "./tools.js";
 
 function toolAnnotations(name: DemoToolName) {
   const metadata = getDemoToolMetadata(name);
@@ -16,8 +16,11 @@ function toolAnnotations(name: DemoToolName) {
   };
 }
 
-function resultContent(result: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+function resultContent(result: Record<string, unknown>) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(result) }],
+    structuredContent: result,
+  };
 }
 
 async function executeMcpTool(service: DemoToolService, name: DemoToolName, args: unknown) {
@@ -26,7 +29,8 @@ async function executeMcpTool(service: DemoToolService, name: DemoToolName, args
     testId: "manual-mcp-call",
     provenance: "RUNTIME",
   });
-  return resultContent(output.result);
+  const result = DemoToolOutputSchemas[name].parse(output.result);
+  return resultContent(result);
 }
 
 export function createDemoMcpServer(service: DemoToolService): McpServer {
@@ -34,57 +38,57 @@ export function createDemoMcpServer(service: DemoToolService): McpServer {
 
   server.registerTool(
     "list_issues",
-    { description: getDemoToolMetadata("list_issues").description, inputSchema: DemoToolInputSchemas.list_issues, annotations: toolAnnotations("list_issues") },
+    { description: getDemoToolMetadata("list_issues").description, inputSchema: DemoToolInputSchemas.list_issues, outputSchema: DemoToolOutputSchemas.list_issues, annotations: toolAnnotations("list_issues") },
     async (args) => executeMcpTool(service, "list_issues", args),
   );
   server.registerTool(
     "read_issue",
-    { description: getDemoToolMetadata("read_issue").description, inputSchema: DemoToolInputSchemas.read_issue, annotations: toolAnnotations("read_issue") },
+    { description: getDemoToolMetadata("read_issue").description, inputSchema: DemoToolInputSchemas.read_issue, outputSchema: DemoToolOutputSchemas.read_issue, annotations: toolAnnotations("read_issue") },
     async (args) => executeMcpTool(service, "read_issue", args),
   );
   server.registerTool(
     "read_pull_request",
-    { description: getDemoToolMetadata("read_pull_request").description, inputSchema: DemoToolInputSchemas.read_pull_request, annotations: toolAnnotations("read_pull_request") },
+    { description: getDemoToolMetadata("read_pull_request").description, inputSchema: DemoToolInputSchemas.read_pull_request, outputSchema: DemoToolOutputSchemas.read_pull_request, annotations: toolAnnotations("read_pull_request") },
     async (args) => executeMcpTool(service, "read_pull_request", args),
   );
   server.registerTool(
     "read_file",
-    { description: getDemoToolMetadata("read_file").description, inputSchema: DemoToolInputSchemas.read_file, annotations: toolAnnotations("read_file") },
+    { description: getDemoToolMetadata("read_file").description, inputSchema: DemoToolInputSchemas.read_file, outputSchema: DemoToolOutputSchemas.read_file, annotations: toolAnnotations("read_file") },
     async (args) => executeMcpTool(service, "read_file", args),
   );
   server.registerTool(
     "list_files",
-    { description: getDemoToolMetadata("list_files").description, inputSchema: DemoToolInputSchemas.list_files, annotations: toolAnnotations("list_files") },
+    { description: getDemoToolMetadata("list_files").description, inputSchema: DemoToolInputSchemas.list_files, outputSchema: DemoToolOutputSchemas.list_files, annotations: toolAnnotations("list_files") },
     async (args) => executeMcpTool(service, "list_files", args),
   );
   server.registerTool(
     "write_file",
-    { description: getDemoToolMetadata("write_file").description, inputSchema: DemoToolInputSchemas.write_file, annotations: toolAnnotations("write_file") },
+    { description: getDemoToolMetadata("write_file").description, inputSchema: DemoToolInputSchemas.write_file, outputSchema: DemoToolOutputSchemas.write_file, annotations: toolAnnotations("write_file") },
     async (args) => executeMcpTool(service, "write_file", args),
   );
   server.registerTool(
     "delete_file",
-    { description: getDemoToolMetadata("delete_file").description, inputSchema: DemoToolInputSchemas.delete_file, annotations: toolAnnotations("delete_file") },
+    { description: getDemoToolMetadata("delete_file").description, inputSchema: DemoToolInputSchemas.delete_file, outputSchema: DemoToolOutputSchemas.delete_file, annotations: toolAnnotations("delete_file") },
     async (args) => executeMcpTool(service, "delete_file", args),
   );
   server.registerTool(
     "create_pull_request",
-    { description: getDemoToolMetadata("create_pull_request").description, inputSchema: DemoToolInputSchemas.create_pull_request, annotations: toolAnnotations("create_pull_request") },
+    { description: getDemoToolMetadata("create_pull_request").description, inputSchema: DemoToolInputSchemas.create_pull_request, outputSchema: DemoToolOutputSchemas.create_pull_request, annotations: toolAnnotations("create_pull_request") },
     async (args) => executeMcpTool(service, "create_pull_request", args),
   );
   server.registerTool(
     "merge_pull_request",
-    { description: getDemoToolMetadata("merge_pull_request").description, inputSchema: DemoToolInputSchemas.merge_pull_request, annotations: toolAnnotations("merge_pull_request") },
+    { description: getDemoToolMetadata("merge_pull_request").description, inputSchema: DemoToolInputSchemas.merge_pull_request, outputSchema: DemoToolOutputSchemas.merge_pull_request, annotations: toolAnnotations("merge_pull_request") },
     async (args) => executeMcpTool(service, "merge_pull_request", args),
   );
   server.registerTool(
     "send_message",
-    { description: getDemoToolMetadata("send_message").description, inputSchema: DemoToolInputSchemas.send_message, annotations: toolAnnotations("send_message") },
+    { description: getDemoToolMetadata("send_message").description, inputSchema: DemoToolInputSchemas.send_message, outputSchema: DemoToolOutputSchemas.send_message, annotations: toolAnnotations("send_message") },
     async (args) => executeMcpTool(service, "send_message", args),
   );
   server.registerTool(
     "reset_demo_state",
-    { description: getDemoToolMetadata("reset_demo_state").description, inputSchema: DemoToolInputSchemas.reset_demo_state, annotations: toolAnnotations("reset_demo_state") },
+    { description: getDemoToolMetadata("reset_demo_state").description, inputSchema: DemoToolInputSchemas.reset_demo_state, outputSchema: DemoToolOutputSchemas.reset_demo_state, annotations: toolAnnotations("reset_demo_state") },
     async (args) => executeMcpTool(service, "reset_demo_state", args),
   );
 

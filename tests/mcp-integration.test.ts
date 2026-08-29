@@ -43,9 +43,11 @@ describe("demo MCP server", () => {
     const listed = await client.listTools();
     expect(listed.tools).toHaveLength(11);
     expect(listed.tools.map((tool) => tool.name)).toContain("merge_pull_request");
+    expect(listed.tools.every((tool) => tool.outputSchema !== undefined)).toBe(true);
 
     const issue = await client.callTool({ name: "read_issue", arguments: { issueNumber: 42 } });
     expect(JSON.stringify(textResult(issue))).toContain("merge PR #19");
+    expect(issue.structuredContent).toEqual(textResult(issue));
 
     await client.callTool({ name: "write_file", arguments: { path: "mcp-created.txt", content: "demo" } });
     expect(running.service.state.readFile("mcp-created.txt").content).toBe("demo");

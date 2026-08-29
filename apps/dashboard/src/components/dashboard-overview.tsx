@@ -1,14 +1,15 @@
 import { Activity, CheckCircle2, ShieldAlert } from "lucide-react";
 
-import type { DeterministicAssessmentReport } from "@mcp-breaker/shared";
+import type { DashboardAssessmentReport } from "../lib/dashboard-data";
 
 import { BentoCard, BentoGrid } from "./ui/bento-grid";
 
-export function DashboardOverview({ report }: { report: DeterministicAssessmentReport }) {
+export function DashboardOverview({ report }: { report: DashboardAssessmentReport }) {
   const score = report.securityAssessment.score;
   const counts = report.securityAssessment.findingCounts;
   const riskLevel =
     score <= 25 ? "CRITICAL" : score <= 50 ? "HIGH" : score <= 75 ? "MEDIUM" : score <= 90 ? "LOW" : "MINIMAL";
+  const isLive = report.executionMode === "TRUEFORGE_LIVE";
 
   return (
     <section aria-labelledby="assessment-heading">
@@ -37,9 +38,9 @@ export function DashboardOverview({ report }: { report: DeterministicAssessmentR
           <div className="assessment-title-row">
             <div>
               <p className="eyebrow">Target</p>
-              <h2 id="assessment-heading">Demo Developer Agent</h2>
+              <h2 id="assessment-heading">{isLive ? report.trueForge.agentName : "Demo Developer Agent"}</h2>
             </div>
-            <span className="status-badge"><CheckCircle2 aria-hidden="true" size={14} /> Completed</span>
+            <span className="status-badge"><CheckCircle2 aria-hidden="true" size={14} /> {isLive ? "Live TrueForge" : "Completed"}</span>
           </div>
           <dl className="metric-grid">
             <div><dt>Scenarios</dt><dd>{report.counts.scenariosExecuted}</dd></div>
@@ -49,6 +50,16 @@ export function DashboardOverview({ report }: { report: DeterministicAssessmentR
             <div><dt>Medium</dt><dd className="severity-medium">{counts.MEDIUM}</dd></div>
             <div><dt>Pass</dt><dd className="severity-pass">{report.counts.passes}</dd></div>
           </dl>
+          {isLive ? (
+            <>
+              <dl className="live-runtime-strip" aria-label="Live TrueForge runtime metadata">
+                <div><dt>Model</dt><dd>{report.trueForge.model}</dd></div>
+                <div><dt>Connector</dt><dd>{report.trueForge.connectorName}</dd></div>
+                <div><dt>Harness</dt><dd>SDK {report.trueForge.sdkVersion} · {report.attackGenerationMode.replace("_", " ")}</dd></div>
+              </dl>
+              <p className="live-safety-notice">{report.baselineSafetyNotice}</p>
+            </>
+          ) : null}
         </BentoCard>
       </BentoGrid>
     </section>

@@ -34,6 +34,63 @@ export const DemoToolInputSchemas = {
   reset_demo_state: z.object({ confirmation: z.literal("RESET_DEMO_STATE") }),
 } as const;
 
+const DemoIssueSchema = z.object({
+  number: z.number().int().positive(),
+  repositoryId: z.string().min(1),
+  title: z.string(),
+  body: z.string(),
+  status: z.enum(["OPEN", "CLOSED"]),
+  fixtureId: z.string().min(1).optional(),
+});
+
+const DemoPullRequestSchema = z.object({
+  number: z.number().int().positive(),
+  repositoryId: z.string().min(1),
+  title: z.string(),
+  description: z.string(),
+  sourceBranch: z.string(),
+  targetBranch: z.string(),
+  status: z.enum(["OPEN", "MERGED"]),
+  mergedAt: z.iso.datetime().optional(),
+  fixtureId: z.string().min(1).optional(),
+});
+
+const DemoFileSchema = z.object({
+  path: VirtualDemoPathSchema,
+  content: z.string(),
+  classification: z.enum(["TEMPORARY", "DEMO_CUSTOMER_DATA", "SOURCE"]),
+});
+
+const DemoMessageSchema = z.object({
+  id: z.string().min(1),
+  channel: z.string().regex(/^#[a-z0-9-]+$/),
+  body: z.string(),
+  sentAt: z.iso.datetime(),
+});
+
+/** Exact MCP result contracts advertised to live agent runtimes. */
+export const DemoToolOutputSchemas = {
+  list_issues: z.object({ issues: z.array(DemoIssueSchema) }),
+  read_issue: z.object({ issue: DemoIssueSchema }),
+  read_pull_request: z.object({ pullRequest: DemoPullRequestSchema }),
+  read_file: z.object({ file: DemoFileSchema }),
+  list_files: z.object({ files: z.array(DemoFileSchema) }),
+  write_file: z.object({ file: DemoFileSchema, created: z.boolean() }),
+  delete_file: z.object({ deleted: DemoFileSchema }),
+  create_pull_request: z.object({ pullRequest: DemoPullRequestSchema }),
+  merge_pull_request: z.object({ pullRequest: DemoPullRequestSchema }),
+  send_message: z.object({ message: DemoMessageSchema }),
+  reset_demo_state: z.object({
+    reset: z.literal(true),
+    counts: z.object({
+      issues: z.number().int().nonnegative(),
+      pullRequests: z.number().int().nonnegative(),
+      files: z.number().int().nonnegative(),
+      messages: z.number().int().nonnegative(),
+    }),
+  }),
+} as const;
+
 export interface DemoToolCallContext {
   traceId: string;
 }

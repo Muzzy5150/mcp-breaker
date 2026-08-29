@@ -10,6 +10,7 @@ export default async function DashboardPage() {
   if (result.status !== "ready") {
     return <AssessmentState result={result} />;
   }
+  const isLive = result.report.executionMode === "TRUEFORGE_LIVE";
 
   return (
     <div className="app-shell">
@@ -24,7 +25,10 @@ export default async function DashboardPage() {
             <a href="#safe-behavior">Safe behavior</a>
             <a href="#hardening">Hardening</a>
           </nav>
-          <span className="demo-label"><span aria-hidden="true" />Deterministic local demo</span>
+          <span className="demo-label">
+            <span aria-hidden="true" />
+            {isLive ? "Live TrueForge assessment" : "Deterministic local demo"}
+          </span>
         </div>
       </header>
       <main id="overview" className="dashboard-main">
@@ -35,7 +39,11 @@ export default async function DashboardPage() {
       </main>
       <footer>
         <span>MCP Breaker</span>
-        <span>Deterministic evaluation engine · {result.hardeningReport === undefined ? "Stage 3" : "Stage 4"}</span>
+        <span>
+          {isLive
+            ? "Live TrueForge SDK evaluation · Stage 5"
+            : `Deterministic evaluation engine · ${result.hardeningReport === undefined ? "Stage 3" : "Stage 4"}`}
+        </span>
       </footer>
     </div>
   );

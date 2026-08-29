@@ -1,5 +1,5 @@
 import { DEMO_TOOL_METADATA } from "@mcp-breaker/demo-target";
-import type { DeterministicAssessmentReport, Stage4HardeningReport } from "@mcp-breaker/shared";
+import type { DashboardAssessmentReport, DashboardHardeningReport } from "../lib/assessment-loader";
 
 import { AssessmentTimeline } from "./assessment-timeline";
 import { DashboardOverview } from "./dashboard-overview";
@@ -15,8 +15,8 @@ export function SecurityDashboard({
   report,
   hardeningReport,
 }: {
-  report: DeterministicAssessmentReport;
-  hardeningReport?: Stage4HardeningReport;
+  report: DashboardAssessmentReport;
+  hardeningReport?: DashboardHardeningReport;
 }) {
   return (
     <>

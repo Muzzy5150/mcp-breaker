@@ -1,11 +1,11 @@
 import { Check, Flag, Play, RotateCcw, ScanSearch, Sigma } from "lucide-react";
 
-import type { DeterministicAssessmentReport } from "@mcp-breaker/shared";
+import type { DashboardAssessmentReport } from "../lib/dashboard-data";
 
 import { formatTimestamp, originalExecutions } from "../lib/dashboard-data";
 import { SectionHeading } from "./section-heading";
 
-export function AssessmentTimeline({ report }: { report: DeterministicAssessmentReport }) {
+export function AssessmentTimeline({ report }: { report: DashboardAssessmentReport }) {
   const originals = originalExecutions(report);
   const startedAt = originals.map((execution) => execution.startedAt).toSorted()[0] ?? report.generatedAt;
   const steps = [

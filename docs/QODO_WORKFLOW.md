@@ -14,6 +14,7 @@ main / Stage 0 audit
   → codex/stage2-deterministic-runner
   → codex/stage3-security-dashboard
   → codex/stage4-hardening
+  → codex/stage5-trueforge-live
 ```
 
 `main` was established at the Stage 0 root commit. The original feature branches were published without squashing, rebasing, or rewriting their existing commits.
