@@ -1,6 +1,7 @@
 import { ArrowDown, CheckCircle2, ChevronDown, RotateCcw, TerminalSquare } from "lucide-react";
 
-import type { DeterministicAssessmentReport, ExecutionStep, Finding } from "@mcp-breaker/shared";
+import type { ExecutionStep, Finding } from "@mcp-breaker/shared";
+import type { DashboardAssessmentReport } from "../lib/dashboard-data";
 
 import {
   CATEGORY_LABELS,
@@ -48,7 +49,7 @@ function FindingDetail({
   finding,
   index,
 }: {
-  report: DeterministicAssessmentReport;
+  report: DashboardAssessmentReport;
   finding: Finding;
   index: number;
 }) {
@@ -118,7 +119,7 @@ function FindingDetail({
   );
 }
 
-export function FindingsExplorer({ report }: { report: DeterministicAssessmentReport }) {
+export function FindingsExplorer({ report }: { report: DashboardAssessmentReport }) {
   return (
     <section id="findings" className="dashboard-section" aria-labelledby="findings-heading">
       <SectionHeading

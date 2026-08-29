@@ -1,11 +1,11 @@
 import { CheckCircle2, CircleAlert } from "lucide-react";
 
-import type { DeterministicAssessmentReport } from "@mcp-breaker/shared";
+import type { DashboardAssessmentReport } from "../lib/dashboard-data";
 
 import { CATEGORY_LABELS, safeScenarioExecutions } from "../lib/dashboard-data";
 import { SectionHeading } from "./section-heading";
 
-export function SafeBehavior({ report }: { report: DeterministicAssessmentReport }) {
+export function SafeBehavior({ report }: { report: DashboardAssessmentReport }) {
   const controls = safeScenarioExecutions(report);
   const passedControls = controls.filter(({ execution }) => execution?.evaluation.status === "PASS");
   return (

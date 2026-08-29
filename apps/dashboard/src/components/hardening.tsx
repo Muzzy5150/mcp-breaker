@@ -1,6 +1,6 @@
 import { ArrowRight, CheckCircle2, CircleAlert, LockKeyhole, Shield } from "lucide-react";
 
-import type { Stage4HardeningReport, TargetTool } from "@mcp-breaker/shared";
+import type { LiveHardeningReport, Stage4HardeningReport, TargetTool } from "@mcp-breaker/shared";
 
 import { SectionHeading } from "./section-heading";
 
@@ -143,12 +143,95 @@ function HardeningResults({ report }: { report: Stage4HardeningReport }) {
   );
 }
 
+function LiveHardeningResults({ report }: { report: LiveHardeningReport }) {
+  const before = report.baselineAssessment;
+  const after = report.hardenedAssessment;
+  const remediated = report.remediationResults.filter((result) => result.status === "REMEDIATED").length;
+  return (
+    <>
+      <div className="hardening-truth-banner hardening-truth-banner-live">
+        <span>Live TrueForge enforcement</span>
+        <strong>Real approval pauses · test harness denial</strong>
+      </div>
+      <div className="hardening-summary" aria-label="Live before and after hardening summary">
+        <article>
+          <p className="eyebrow">Live baseline</p>
+          <strong>{before.securityAssessment.score}<small>/100</small></strong>
+          <span>{before.verifiedFindings.length} verified findings</span>
+        </article>
+        <ArrowRight className="hardening-summary-arrow" aria-hidden="true" size={22} />
+        <article className="hardening-after">
+          <p className="eyebrow">Hardened TrueForge retest</p>
+          <strong>{after.securityAssessment.score}<small>/100</small></strong>
+          <span>{after.verifiedFindings.length} verified findings</span>
+        </article>
+        <article className="hardening-proof-count">
+          <p className="eyebrow">Live remediation proofs</p>
+          <strong>{remediated}<small>/{report.remediationResults.length}</small></strong>
+          <span>new-session replay verified</span>
+        </article>
+      </div>
+      <div className="hardening-subsection">
+        <div className="hardening-subheading">
+          <div><p className="eyebrow">Policy applied to test agent</p><h3>{report.policyDiff.length} effective changes</h3></div>
+          <span className="count-chip">{report.requireApprovalForTools.length} approval gates</span>
+        </div>
+        <div className="hardening-list">
+          {report.policyDiff.map((change) => (
+            <article key={change.toolName}>
+              <span className="hardening-icon"><LockKeyhole aria-hidden="true" size={16} /></span>
+              <div><code>{change.toolName}</code><small>{change.reason}</small></div>
+              <dl>
+                <div><dt>Current</dt><dd>{change.currentDisposition}</dd></div>
+                <div><dt>Live retest</dt><dd>{change.proposedDisposition}</dd></div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      </div>
+      <div className="hardening-subsection">
+        <div className="hardening-subheading">
+          <div><p className="eyebrow">Hardened retest</p><h3>TrueForge approval evidence</h3></div>
+          <span className="count-chip count-chip-pass">{remediated} remediated</span>
+        </div>
+        <div className="remediation-list">
+          {report.remediationResults.map((result) => {
+            const finding = before.verifiedFindings.find((candidate) => candidate.stableId === result.findingId);
+            const succeeded = result.status === "REMEDIATED";
+            return (
+              <details key={result.findingId} className="remediation-card">
+                <summary>
+                  <span className={succeeded ? "remediation-status remediation-status-pass" : "remediation-status remediation-status-fail"}>
+                    {succeeded ? <CheckCircle2 aria-hidden="true" size={15} /> : <CircleAlert aria-hidden="true" size={15} />}
+                    {result.status.replaceAll("_", " ")}
+                  </span>
+                  <code>{result.affectedTool}</code>
+                  <span>{finding?.severity ?? "UNKNOWN"}</span>
+                  <span className="remediation-expand">Inspect evidence</span>
+                </summary>
+                <div className="remediation-detail">
+                  <p>{result.summary}</p>
+                  <div className="remediation-compare">
+                    <div><p className="eyebrow">Retest session</p><code>{result.retestExecutionId}</code></div>
+                    <div><p className="eyebrow">Clean replay session</p><code>{result.replayExecutionId}</code></div>
+                  </div>
+                  <p>{result.approvalEvidenceIds.length} persisted approval-denial evidence records · State mutation prevented: {result.stateMutationPrevented ? "yes" : "no"}</p>
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function Hardening({
   tools,
   report,
 }: {
   tools: readonly TargetTool[];
-  report?: Stage4HardeningReport;
+  report?: Stage4HardeningReport | LiveHardeningReport;
 }) {
   return (
     <section id="hardening" className="dashboard-section hardening-section" aria-labelledby="hardening-heading">
@@ -158,12 +241,18 @@ export function Hardening({
         description={
           report === undefined
             ? "Metadata-based preview only. Recommendations are not autonomously generated and no policy is applied."
-            : "Deterministic local enforcement of the generated proposal against the same scenarios. Every result below is backed by policy-decision and replay evidence."
+            : report.executionMode === "TRUEFORGE_LIVE"
+              ? "Live TrueForge approval enforcement against the same natural-language scenarios, backed by persisted events and clean-session replay evidence."
+              : "Deterministic local enforcement of the generated proposal against the same scenarios. Every result below is backed by policy-decision and replay evidence."
         }
         headingId="hardening-heading"
         aside={<Shield aria-hidden="true" size={22} />}
       />
-      {report === undefined ? <MetadataPreview tools={tools} /> : <HardeningResults report={report} />}
+      {report === undefined
+        ? <MetadataPreview tools={tools} />
+        : report.executionMode === "TRUEFORGE_LIVE"
+          ? <LiveHardeningResults report={report} />
+          : <HardeningResults report={report} />}
     </section>
   );
 }

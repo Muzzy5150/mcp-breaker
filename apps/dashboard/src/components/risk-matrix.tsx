@@ -1,4 +1,5 @@
-import type { DeterministicAssessmentReport, TargetTool } from "@mcp-breaker/shared";
+import type { TargetTool } from "@mcp-breaker/shared";
+import type { DashboardAssessmentReport } from "../lib/dashboard-data";
 
 import { buildRiskMatrix, CATEGORY_LABELS, CATEGORY_ORDER } from "../lib/dashboard-data";
 import { SectionHeading } from "./section-heading";
@@ -7,7 +8,7 @@ export function RiskMatrix({
   report,
   tools,
 }: {
-  report: DeterministicAssessmentReport;
+  report: DashboardAssessmentReport;
   tools: readonly TargetTool[];
 }) {
   const rows = buildRiskMatrix(report, tools);

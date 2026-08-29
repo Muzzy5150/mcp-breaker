@@ -14,4 +14,6 @@ coverage/
 *.sqlite-wal
 artifacts/demo-assessment.json
 artifacts/demo-hardening.json
+artifacts/live-assessment.json
+artifacts/live-hardening.json
 apps/dashboard/next-env.d.ts

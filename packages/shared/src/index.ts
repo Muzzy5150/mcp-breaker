@@ -682,3 +682,169 @@ export const Stage4HardeningReportSchema = z
     }
   });
 export type Stage4HardeningReport = z.infer<typeof Stage4HardeningReportSchema>;
+
+export const TrueForgeEventEvidenceSchema = z.object({
+  sequenceNumber: z.number().int().nonnegative(),
+  turnId: z.string().min(1).optional(),
+  eventId: z.string().min(1),
+  eventType: z.string().min(1),
+  recordedAt: z.iso.datetime(),
+  threadId: z.string().min(1).nullable().optional(),
+  toolCallId: z.string().min(1).optional(),
+  sandboxId: z.string().min(1).optional(),
+});
+export type TrueForgeEventEvidence = z.infer<typeof TrueForgeEventEvidenceSchema>;
+
+export const LiveToolCallEvidenceSchema = z.object({
+  toolCallId: z.string().min(1),
+  sourceEventId: z.string().min(1),
+  responseEventId: z.string().min(1).optional(),
+  threadId: z.string().min(1),
+  toolName: z.string().min(1),
+  serverName: z.string().min(1),
+  arguments: z.json(),
+  result: z.json().optional(),
+  error: z.string().min(1).optional(),
+  executed: z.boolean(),
+});
+export type LiveToolCallEvidence = z.infer<typeof LiveToolCallEvidenceSchema>;
+
+export const LiveApprovalEvidenceSchema = z.object({
+  eventId: z.string().min(1),
+  turnId: z.string().min(1),
+  threadId: z.string().min(1),
+  toolCallId: z.string().min(1),
+  status: z.enum(["allow", "deny"]),
+  reason: z.string().min(1).optional(),
+  automated: z.boolean(),
+});
+export type LiveApprovalEvidence = z.infer<typeof LiveApprovalEvidenceSchema>;
+
+export const LiveScenarioExecutionSchema = z.object({
+  runId: z.string().min(1),
+  scenarioId: z.string().min(1),
+  category: AttackCategorySchema,
+  controlType: z.enum(["SAFE_CONTROL", "UNSAFE_FIXTURE"]),
+  expectedOutcome: z.enum(["PASS", "CANDIDATE_FINDING"]),
+  executionId: z.string().min(1),
+  traceId: z.string().min(1),
+  replayOfExecutionId: z.string().min(1).optional(),
+  agentId: z.string().min(1),
+  agentName: z.string().min(1),
+  sessionId: z.string().min(1),
+  turnIds: z.array(z.string().min(1)).min(1),
+  prompt: z.string().min(1),
+  startedAt: z.iso.datetime(),
+  completedAt: z.iso.datetime(),
+  baselineState: z.json(),
+  finalState: z.json(),
+  finalResponse: z.string(),
+  events: z.array(TrueForgeEventEvidenceSchema).min(1),
+  toolCalls: z.array(LiveToolCallEvidenceSchema),
+  approvals: z.array(LiveApprovalEvidenceSchema),
+  trace: ExecutionTraceSchema,
+  observedBehavior: ObservedBehaviorSchema,
+  evaluation: BehaviorEvaluationSchema,
+  recoveryEvidence: z.object({
+    getTurnVerified: z.boolean(),
+    listTurnEventsVerified: z.boolean(),
+    subscribeResumeVerified: z.boolean(),
+    lastSequenceNumber: z.number().int().nonnegative(),
+  }),
+});
+export type LiveScenarioExecution = z.infer<typeof LiveScenarioExecutionSchema>;
+
+export const LiveReplayVerificationSchema = z.object({
+  outcome: ReplayOutcomeSchema,
+  originalExecutionId: z.string().min(1),
+  replayExecutionId: z.string().min(1),
+  summary: z.string().min(1),
+});
+export type LiveReplayVerification = z.infer<typeof LiveReplayVerificationSchema>;
+
+export const LIVE_BASELINE_SAFETY_NOTICE = "Baseline agent intentionally runs with permissive tool approval against disposable local state so MCP Breaker can observe unsafe behavior." as const;
+
+export const LiveAssessmentReportSchema = z.object({
+  reportVersion: z.literal("3.0.0"),
+  executionMode: z.literal("TRUEFORGE_LIVE"),
+  attackGenerationMode: z.literal("PREDEFINED_SCENARIOS"),
+  autonomousAgentExecution: z.literal(true),
+  trueForgeIntegrated: z.literal(true),
+  baselineSafetyNotice: z.literal(LIVE_BASELINE_SAFETY_NOTICE),
+  runId: z.string().min(1),
+  generatedAt: z.iso.datetime(),
+  trueForge: z.object({
+    baseUrl: z.string().url(),
+    model: z.string().min(1),
+    connectorName: z.string().min(1),
+    connectorUrl: z.string().url(),
+    agentId: z.string().min(1),
+    agentName: z.string().min(1),
+    sdkVersion: z.string().min(1),
+  }),
+  scenarios: z.array(AttackScenarioSchema).min(1),
+  scenarioPrompts: z.record(z.string(), z.string().min(1)),
+  executions: z.array(LiveScenarioExecutionSchema),
+  replayVerifications: z.array(LiveReplayVerificationSchema),
+  verifiedFindings: z.array(FindingSchema),
+  counts: AssessmentCountsSchema,
+  securityAssessment: SecurityAssessmentSchema,
+  infrastructureEvidence: z.object({
+    sandbox: z.object({
+      attempted: z.boolean(),
+      passed: z.boolean(),
+      marker: z.literal("MCP_BREAKER_SANDBOX_OK").optional(),
+      sandboxId: z.string().min(1).optional(),
+      sessionId: z.string().min(1).optional(),
+      turnId: z.string().min(1).optional(),
+      result: z.string().optional(),
+    }),
+    subagent: z.object({
+      attempted: z.boolean(),
+      observed: z.boolean(),
+      eventIds: z.array(z.string().min(1)),
+      note: z.string().min(1),
+    }),
+    cancellation: z.object({
+      attempted: z.boolean(),
+      verified: z.boolean(),
+      sessionId: z.string().min(1).optional(),
+      note: z.string().min(1),
+    }),
+  }),
+});
+export type LiveAssessmentReport = z.infer<typeof LiveAssessmentReportSchema>;
+
+export const LiveRemediationResultSchema = z.object({
+  findingId: z.string().min(1),
+  scenarioId: z.string().min(1),
+  affectedTool: z.string().min(1),
+  proposedDisposition: PolicyDispositionSchema,
+  retestExecutionId: z.string().min(1),
+  replayExecutionId: z.string().min(1),
+  approvalEvidenceIds: z.array(z.string().min(1)),
+  stateMutationPrevented: z.boolean(),
+  status: RemediationStatusSchema,
+  summary: z.string().min(1),
+});
+export type LiveRemediationResult = z.infer<typeof LiveRemediationResultSchema>;
+
+export const LiveHardeningReportSchema = z.object({
+  reportVersion: z.literal("3.1.0"),
+  executionMode: z.literal("TRUEFORGE_LIVE"),
+  enforcementMode: z.literal("TRUEFORGE_TOOL_APPROVAL"),
+  autonomousAgentExecution: z.literal(true),
+  trueForgeIntegrated: z.literal(true),
+  policyAppliedToTrueForge: z.literal(true),
+  runId: z.string().min(1),
+  generatedAt: z.iso.datetime(),
+  baselineAssessment: LiveAssessmentReportSchema,
+  currentPolicy: ToolPolicySchema,
+  proposedPolicy: ToolPolicySchema,
+  policyDiff: z.array(PolicyChangeSchema),
+  policyGenerationProvenance: z.array(PolicyRuleProvenanceSchema).min(1),
+  requireApprovalForTools: z.array(z.string().min(1)),
+  hardenedAssessment: LiveAssessmentReportSchema,
+  remediationResults: z.array(LiveRemediationResultSchema),
+});
+export type LiveHardeningReport = z.infer<typeof LiveHardeningReportSchema>;

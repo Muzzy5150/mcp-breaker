@@ -3,16 +3,24 @@ import { resolve } from "node:path";
 
 import {
   DeterministicAssessmentReportSchema,
+  LiveAssessmentReportSchema,
+  LiveHardeningReportSchema,
   Stage4HardeningReportSchema,
   type DeterministicAssessmentReport,
+  type LiveAssessmentReport,
+  type LiveHardeningReport,
   type Stage4HardeningReport,
 } from "@mcp-breaker/shared";
+
+export type DashboardAssessmentReport = DeterministicAssessmentReport | LiveAssessmentReport;
+export type DashboardHardeningReport = Stage4HardeningReport | LiveHardeningReport;
 
 export type AssessmentLoadResult =
   | {
       status: "ready";
-      report: DeterministicAssessmentReport;
-      hardeningReport?: Stage4HardeningReport;
+      report: DashboardAssessmentReport;
+      hardeningReport?: DashboardHardeningReport;
+      sourceMode: "TRUEFORGE_LIVE" | "DETERMINISTIC_LOCAL_DEMO";
       reportPath: string;
     }
   | { status: "missing"; message: string }
@@ -26,6 +34,10 @@ type ReadyAssessment = Extract<AssessmentLoadResult, { status: "ready" }>;
 
 function defaultReportCandidates(): string[] {
   return [
+    resolve(process.cwd(), "artifacts", "live-hardening.json"),
+    resolve(process.cwd(), "..", "..", "artifacts", "live-hardening.json"),
+    resolve(process.cwd(), "artifacts", "live-assessment.json"),
+    resolve(process.cwd(), "..", "..", "artifacts", "live-assessment.json"),
     resolve(process.cwd(), "artifacts", "demo-hardening.json"),
     resolve(process.cwd(), "..", "..", "artifacts", "demo-hardening.json"),
     resolve(process.cwd(), "artifacts", "demo-assessment.json"),
@@ -35,6 +47,25 @@ function defaultReportCandidates(): string[] {
 
 function parseAssessment(raw: string, reportPath: string): ReadyAssessment | undefined {
   const parsed: unknown = JSON.parse(raw);
+  const liveHardeningResult = LiveHardeningReportSchema.safeParse(parsed);
+  if (liveHardeningResult.success) {
+    return {
+      status: "ready",
+      report: liveHardeningResult.data.baselineAssessment,
+      hardeningReport: liveHardeningResult.data,
+      reportPath,
+      sourceMode: "TRUEFORGE_LIVE",
+    };
+  }
+  const liveResult = LiveAssessmentReportSchema.safeParse(parsed);
+  if (liveResult.success) {
+    return {
+      status: "ready",
+      report: liveResult.data,
+      reportPath,
+      sourceMode: "TRUEFORGE_LIVE",
+    };
+  }
   const hardeningResult = Stage4HardeningReportSchema.safeParse(parsed);
   if (hardeningResult.success) {
     return {
@@ -42,10 +73,13 @@ function parseAssessment(raw: string, reportPath: string): ReadyAssessment | und
       report: hardeningResult.data.baselineAssessment,
       hardeningReport: hardeningResult.data,
       reportPath,
+      sourceMode: "DETERMINISTIC_LOCAL_DEMO",
     };
   }
   const result = DeterministicAssessmentReportSchema.safeParse(parsed);
-  return result.success ? { status: "ready", report: result.data, reportPath } : undefined;
+  return result.success
+    ? { status: "ready", report: result.data, reportPath, sourceMode: "DETERMINISTIC_LOCAL_DEMO" }
+    : undefined;
 }
 
 function freshness(result: ReadyAssessment): number {
@@ -71,7 +105,7 @@ export async function loadAssessment(
       if (code === "ENOENT") {
         return {
           status: "missing",
-          message: "No assessment report is available. Run the deterministic local assessment to populate this dashboard.",
+          message: "No assessment report is available. Run a live or deterministic assessment to populate this dashboard.",
         };
       }
       const message = error instanceof SyntaxError
@@ -101,7 +135,11 @@ export async function loadAssessment(
     }
   }
 
-  ready.sort((left, right) => freshness(right.result) - freshness(left.result) || left.priority - right.priority);
+  ready.sort(
+    options.defaultCandidates === undefined
+      ? (left, right) => left.priority - right.priority || freshness(right.result) - freshness(left.result)
+      : (left, right) => freshness(right.result) - freshness(left.result) || left.priority - right.priority,
+  );
   if (ready[0] !== undefined) {
     return ready[0].result;
   }
@@ -114,6 +152,6 @@ export async function loadAssessment(
   }
   return {
     status: "missing",
-    message: "No assessment report is available. Run the deterministic local assessment to populate this dashboard.",
+    message: "No assessment report is available. Run a live or deterministic assessment to populate this dashboard.",
   };
 }

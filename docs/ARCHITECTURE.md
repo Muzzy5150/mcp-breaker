@@ -61,7 +61,7 @@ A candidate does not become a finding until replay verifies it. Aggregate scores
 
 ## Current implementation boundary
 
-Stages 1 through 4 now implement the deterministic local demo target, evaluation pipeline, security evidence dashboard, proposed least-privilege policy generation, local policy enforcement, same-scenario hardened retesting, and before/after remediation evidence. The repository contains an in-memory MCP target, paired safe/unsafe scenario fixtures, an execution-adapter boundary, rule-based evaluation, clean-state replay, evidence-backed finding promotion, verified-finding scoring, policy validation and provenance, pre-execution decision evidence, and schema-validated Stage 2 and Stage 4 reports. It contains no autonomous attack agent, model client, TrueForge adapter, external integration, deployed policy, or production finding claim.
+Stages 1 through 5 implement the disposable MCP target, deterministic offline regression pipeline, security dashboard, deterministic policy hardening, and a live TrueForge evaluation path. The live path uses the official SDK, named agents, natural-language turns, persisted events, real MCP calls, direct state snapshots, new-session reproduction, Daytona sandbox proof, session recovery, cancellation, and TrueForge approval pauses. It remains a local demo against simulated in-memory data; it is not a production scan or a claim about any external system.
 
 The Stage 2 flow is:
 
@@ -105,7 +105,31 @@ ScenarioRunner → PolicyEnforcedExecutionAdapter → DeterministicExecutionAdap
 
 The deterministic adapter executes authored test steps and is not an agent runtime. Runtime provenance on a promoted finding means its local tool events and mutations actually occurred; it does not mean an AI autonomously discovered the behavior. Reports retain the deterministic-demo label and link original and replay executions with run, scenario, execution, and trace identifiers.
 
-TrueForge integration remains intentionally deferred until hackathon model credentials are available. When integration begins, it should be added as an adapter around the existing shared schemas and trace model rather than embedded into the demo target.
+Stage 5 composes around the same evaluation boundary without sending deterministic `scriptedSteps` to the model:
+
+```text
+natural-language scenario → TrueForgeExecutionAdapter → TrueForge named agent → mcpbreakerdemo MCP server
+                                      ↓
+                     SDK stream + persisted turn events
+                                      ↓
+                 actual tool calls + direct state snapshots
+                                      ↓
+                     existing expected/observed evaluator
+                                      ↓ candidates only
+                     reset state + new TrueForge session
+                                      ↓ reproduced only
+                          verified live finding + score
+
+verified live findings → deterministic policy engine → hardened agent manifest
+                                      ↓
+                       TrueForge tool approval pause
+                                      ↓ automated test denial
+                  same scenario + clean-session proof replay
+                                      ↓
+                         live before/after report
+```
+
+The deterministic adapter remains the default offline path. The live adapter is additive and uses the official `@truefoundry/trueforge-sdk`; it does not replace exposed SDK behavior with handwritten HTTP calls.
 
 ## Stage roadmap
 
@@ -129,9 +153,9 @@ Implemented locally: a responsive Next.js dashboard renders the current Stage 2 
 
 Implemented locally: derive the vulnerable current posture, generate and validate a finding-backed least-privilege proposal, enforce all four dispositions before demo tool execution, preserve attempted-call decision evidence, rerun the exact scenario suite, perform clean-state policy proof replays, and emit a validated before/after report. The dashboard renders the real diff and remediation results while the policy remains visibly proposed and unapplied to TrueForge.
 
-### Stage 5 — credential-gated TrueForge execution
+### Stage 5 — live TrueForge execution
 
-When credentials and isolated execution are available, implement `TrueForgeExecutionAdapter`, execute the same scenario/evidence contracts through live agent sessions, connect genuine approval checkpoints, and compare live results with the deterministic baseline. The Stage 4 local enforcement adapter is evidence-compatible scaffolding, not a substitute for TrueForge behavior.
+Implemented on the Stage 5 branch: official SDK preflight and agent reconciliation, real natural-language target turns, MCP event/state correlation, clean-session reproduction, live finding promotion and scoring, policy-derived approval configuration, automated or interactive approval responses, hardened retests, sandbox/subagent/cancellation evidence, live artifacts, and dashboard rendering. The smoke agent is inspected but never modified.
 
 ### Stage 6 — assessment history and release hardening
 

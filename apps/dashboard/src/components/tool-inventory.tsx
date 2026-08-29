@@ -1,6 +1,7 @@
 import { Check, ShieldAlert } from "lucide-react";
 
-import type { DeterministicAssessmentReport, TargetTool } from "@mcp-breaker/shared";
+import type { TargetTool } from "@mcp-breaker/shared";
+import type { DashboardAssessmentReport } from "../lib/dashboard-data";
 
 import { SectionHeading } from "./section-heading";
 
@@ -12,7 +13,7 @@ export function ToolInventory({
   report,
   tools,
 }: {
-  report: DeterministicAssessmentReport;
+  report: DashboardAssessmentReport;
   tools: readonly TargetTool[];
 }) {
   const affected = new Set(report.verifiedFindings.map((finding) => finding.targetTool));
