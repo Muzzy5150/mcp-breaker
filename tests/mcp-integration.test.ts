@@ -1,5 +1,5 @@
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
-import { startDemoMcpHttpServer } from "@mcp-breaker/demo-target";
+import { formatDemoMcpUrl, startDemoMcpHttpServer } from "@mcp-breaker/demo-target";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { RunningDemoMcpHttpServer } from "@mcp-breaker/demo-target";
@@ -22,6 +22,18 @@ function textResult(result: Awaited<ReturnType<Client["callTool"]>>): unknown {
 }
 
 describe("demo MCP server", () => {
+  it("rejects non-loopback bind addresses before opening a listener", async () => {
+    await expect(startDemoMcpHttpServer({ host: "0.0.0.0" })).rejects.toThrow(
+      "host must be a loopback address",
+    );
+  });
+
+  it("returns a valid endpoint URL for the IPv6 loopback address", () => {
+    const endpoint = new URL(formatDemoMcpUrl("::1", 18_880));
+    expect(endpoint.hostname).toBe("[::1]");
+    expect(endpoint.pathname).toBe("/mcp");
+  });
+
   it("starts locally, discovers all tools, mutates disposable state, and resets", async () => {
     running = await startDemoMcpHttpServer();
     const client = new Client({ name: "mcp-breaker-test-client", version: "0.1.0" });

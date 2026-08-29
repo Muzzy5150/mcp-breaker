@@ -6,6 +6,7 @@ import {
   DeterministicAssessmentReportSchema,
   FindingSchema,
   ReplayVerificationSchema,
+  type ScenarioExecutionFailure,
   type AttackScenario,
   type DeterministicAssessmentReport,
   type Finding,
@@ -14,7 +15,7 @@ import {
 } from "@mcp-breaker/shared";
 
 import { DeterministicExecutionAdapter, type ExecutionAdapter } from "./adapter.js";
-import { ScenarioRunner } from "./runner.js";
+import { ScenarioLifecycleError, ScenarioRunner } from "./runner.js";
 
 function violatingStepIds(execution: ScenarioExecution): string[] {
   return [...new Set(execution.evaluation.violations.flatMap((violation) => violation.stepIds))];
@@ -90,11 +91,21 @@ export async function runAssessment(
   const runner = new ScenarioRunner(adapter, clock, ids);
   const runId = ids.next("assessment");
   const executions: ScenarioExecution[] = [];
+  const executionFailures: ScenarioExecutionFailure[] = [];
   const replayVerifications: ReplayVerification[] = [];
   const verifiedFindings: Finding[] = [];
 
   for (const scenario of scenarios) {
-    const execution = await runner.runScenario(scenario, { runId });
+    let execution: ScenarioExecution;
+    try {
+      execution = await runner.runScenario(scenario, { runId });
+    } catch (error) {
+      if (!(error instanceof ScenarioLifecycleError)) {
+        throw error;
+      }
+      executionFailures.push(error.failure);
+      continue;
+    }
     executions.push(execution);
     if (execution.evaluation.status !== "CANDIDATE_FINDING") {
       continue;
@@ -128,12 +139,21 @@ export async function runAssessment(
         verifiedFindings.push(promoteFinding(scenario, execution, replayExecution));
       }
     } catch (error) {
+      const replayFailure = error instanceof ScenarioLifecycleError ? error.failure : undefined;
+      if (replayFailure !== undefined) {
+        executionFailures.push(replayFailure);
+      }
       replayVerifications.push(
         ReplayVerificationSchema.parse({
           outcome: "REPLAY_ERROR",
           summary: error instanceof Error ? error.message : String(error),
           originalExecutionId: execution.executionId,
-          ...(replayExecution === undefined
+          ...(replayFailure !== undefined
+            ? {
+                replayExecutionId: replayFailure.executionId,
+                replayTraceId: replayFailure.traceId,
+              }
+            : replayExecution === undefined
             ? {}
             : {
                 replayExecutionId: replayExecution.executionId,
@@ -159,16 +179,18 @@ export async function runAssessment(
     generatedAt: clock.now(),
     scenarios,
     executions,
+    executionFailures,
     replayVerifications,
     verifiedFindings,
     counts: {
-      scenariosExecuted: originalExecutions.length,
+      scenariosExecuted: scenarios.length,
       passes: originalExecutions.filter((execution) => execution.evaluation.status === "PASS").length,
       candidates: originalExecutions.filter((execution) => execution.evaluation.status === "CANDIDATE_FINDING").length,
       reproduced: replayVerifications.filter((verification) => verification.outcome === "REPRODUCED").length,
       inconclusive: originalExecutions.filter((execution) => execution.evaluation.status === "INCONCLUSIVE").length,
       errors:
         originalExecutions.filter((execution) => execution.evaluation.status === "EXECUTION_ERROR").length +
+        executionFailures.filter((failure) => failure.replayOfExecutionId === undefined).length +
         replayVerifications.filter((verification) => verification.outcome === "REPLAY_ERROR").length,
     },
     securityAssessment: assessment,

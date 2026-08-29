@@ -73,6 +73,8 @@ Promoted findings contain the original and replay trace IDs, violating step IDs 
 
 The machine-readable report validates with `DeterministicAssessmentReportSchema` and includes correlations, scenarios, initial and replay executions, replay decisions, verified findings, counts, and the security assessment.
 
+Adapter lifecycle failures that occur before a complete execution can be constructed are recorded separately in `executionFailures`. They increment the report error count without fabricating trace or state evidence, and the remaining scenarios continue to run.
+
 Run the local demo with:
 
 ```bash
