@@ -106,6 +106,18 @@ export interface RunningDemoMcpHttpServer {
   close(): Promise<void>;
 }
 
+function assertLoopbackHost(host: string): void {
+  if (host !== "127.0.0.1" && host !== "::1") {
+    throw new Error(`Demo MCP server host must be a loopback address; received ${host}.`);
+  }
+}
+
+export function formatDemoMcpUrl(host: string, port: number): string {
+  assertLoopbackHost(host);
+  const urlHost = host === "::1" ? "[::1]" : host;
+  return `http://${urlHost}:${port}/mcp`;
+}
+
 function hasRequestLine(request: IncomingMessage): request is IncomingMessage & { method: string; url: string } {
   return request.method !== undefined && request.url !== undefined;
 }
@@ -126,9 +138,7 @@ export async function startDemoMcpHttpServer(
   options: DemoMcpHttpServerOptions = {},
 ): Promise<RunningDemoMcpHttpServer> {
   const host = options.host ?? "127.0.0.1";
-  if (host !== "127.0.0.1" && host !== "::1") {
-    throw new Error(`Demo MCP server host must be a loopback address; received ${host}.`);
-  }
+  assertLoopbackHost(host);
   const port = options.port ?? 0;
   const service = options.service ?? new DemoToolService();
   const handler = createMcpHandler(() => createDemoMcpServer(service));
@@ -172,9 +182,8 @@ export async function startDemoMcpHttpServer(
   }
   const actualPort = address.port;
   let closed = false;
-  const urlHost = host === "::1" ? "[::1]" : host;
   return {
-    url: `http://${urlHost}:${actualPort}/mcp`,
+    url: formatDemoMcpUrl(host, actualPort),
     service,
     close: async () => {
       if (closed) {

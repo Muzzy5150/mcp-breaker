@@ -1,5 +1,5 @@
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
-import { startDemoMcpHttpServer } from "@mcp-breaker/demo-target";
+import { formatDemoMcpUrl, startDemoMcpHttpServer } from "@mcp-breaker/demo-target";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { RunningDemoMcpHttpServer } from "@mcp-breaker/demo-target";
@@ -28,9 +28,8 @@ describe("demo MCP server", () => {
     );
   });
 
-  it("returns a valid endpoint URL for the IPv6 loopback address", async () => {
-    running = await startDemoMcpHttpServer({ host: "::1" });
-    const endpoint = new URL(running.url);
+  it("returns a valid endpoint URL for the IPv6 loopback address", () => {
+    const endpoint = new URL(formatDemoMcpUrl("::1", 18_880));
     expect(endpoint.hostname).toBe("[::1]");
     expect(endpoint.pathname).toBe("/mcp");
   });
