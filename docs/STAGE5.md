@@ -17,6 +17,8 @@ The implementation uses the official stable `@truefoundry/trueforge-sdk` package
 
 Model-provider and Daytona credentials stay inside TrueForge. The project accepts an optional `TRUEFORGE_TOKEN` only when the local control plane itself requires bearer authentication. Reports and console summaries contain no credential objects.
 
+The SDK facade rejects non-HTTP(S), credential-bearing, or non-loopback control-plane URLs before it can attach that token or create traffic. Accepted hosts are `localhost`, IPv4 `127.0.0.0/8`, and IPv6 `::1` only.
+
 ## Managed agents
 
 The runner idempotently creates or updates exactly two named targets:
@@ -46,7 +48,7 @@ A candidate is promoted only when all of the following exist:
 
 Missing tool evidence, no mutation, failed turns, or non-reproduction never become verified findings. Scores use verified runtime findings only.
 
-The event recorder stores event IDs, turn IDs, thread IDs, a monotonic sequence cursor, tool-call IDs, arguments, responses, approvals, and agent/session correlation. It uses the SDK's `isEventDelta` and `mergeEventDelta` helpers for streamed model messages. Each execution also verifies `getTurn`, `listTurnEvents`, and cursor-based `subscribeToTurn` recovery.
+The event recorder stores event IDs, turn IDs, thread IDs, a monotonic sequence cursor, tool-call IDs, arguments, responses, approvals, and agent/session correlation. It uses the SDK's `isEventDelta` and `mergeEventDelta` helpers for streamed model messages and deduplicates terminal events when persisted recovery overlaps the live stream. Failed MCP responses remain error trace steps; explicitly denied calls remain unexecuted approval evidence. Each execution also verifies `getTurn`, `listTurnEvents`, and cursor-based `subscribeToTurn` recovery.
 
 ## Approval hardening
 
@@ -58,7 +60,7 @@ A finding is marked remediated only when the broad hardened retest passes and a 
 
 The live harness asks the pre-existing smoke agent to execute `printf 'MCP_BREAKER_SANDBOX_OK'` inside its TrueForge sandbox. Success requires a persisted `sandbox.created` event, a system-tool result containing the exact marker, and an exact final response. A lightweight dynamic-subagent probe is attempted and reported independently; assessment scoring never depends on it.
 
-The live integration command also starts a non-streaming turn and verifies `sessions.cancel` reaches a persisted cancelled state. `Ctrl+C` aborts the active stream, requests cancellation for the active session, and still closes the integrated MCP listener.
+The live integration command also starts a non-streaming turn and verifies `sessions.cancel` reaches a persisted cancelled state. `Ctrl+C` aborts the active stream, requests cancellation for the active session, and still closes the integrated MCP listener. Stream, correlation, recovery, schema, and bounded-continuation failures also cancel the session and release lifecycle tracking rather than evaluating a partial run.
 
 ## Commands
 

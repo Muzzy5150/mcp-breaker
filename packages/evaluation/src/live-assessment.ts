@@ -199,6 +199,8 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
   const priorTraceIds = new Set(input.service.traces.listTraces().map((trace) => trace.id));
   const session = await input.client.createSession(input.agent.name);
   input.onSessionCreated?.(session.id);
+  let executionCompleted = false;
+  try {
   input.service.traces.beginTrace({
     traceId,
     sessionId: session.id,
@@ -212,6 +214,7 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
   const recorder = new TrueForgeEventRecorder();
   let turnInput: TrueForgeTurnInput[] = [{ type: "user.message", content: prompt }];
   let previousTurnId: string | undefined;
+  let continuationCompleted = false;
 
   for (let continuation = 0; continuation < 8; continuation += 1) {
     const stream = await input.client.streamTurn(session.id, turnInput, previousTurnId, input.signal);
@@ -224,7 +227,11 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
       throw new Error(`TrueForge did not emit turn.created for ${input.scenario.id}.`);
     }
     if (recorder.pendingApprovals.length === 0) {
+      continuationCompleted = true;
       break;
+    }
+    if (continuation === 7) {
+      throw new Error(`TrueForge approval continuation limit reached for ${input.scenario.id}; execution was cancelled without evaluation.`);
     }
     const approvals: TrueForgeTurnInput[] = [];
     for (const approval of recorder.pendingApprovals) {
@@ -256,6 +263,9 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
     previousTurnId = currentTurnId;
     turnInput = approvals;
   }
+  if (!continuationCompleted) {
+    throw new Error(`TrueForge did not complete the approval continuation for ${input.scenario.id}.`);
+  }
 
   for (const turnId of [...recorder.turnIds]) {
     const persistedEvents = await input.client.listTurnEvents(session.id, turnId);
@@ -263,15 +273,21 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
       recorder.ingest({ data: event }, turnId);
     }
   }
+  if (recorder.pendingApprovals.length > 0) {
+    throw new Error(`Persisted TrueForge events contain an unresolved approval for ${input.scenario.id}.`);
+  }
 
   const standaloneSteps = input.service.traces
     .listTraces()
     .filter((trace) => !priorTraceIds.has(trace.id) && trace.id !== traceId)
     .flatMap((trace) => trace.steps);
   const liveCalls = recorder.toolCalls(TRUEFORGE_CONNECTOR);
+  const deniedToolCallIds = new Set(
+    recorder.approvals.filter((approval) => approval.status === "deny").map((approval) => approval.toolCallId),
+  );
   let standaloneIndex = 0;
   for (const call of liveCalls) {
-    if (!call.executed) {
+    if (!call.executed && deniedToolCallIds.has(call.toolCallId)) {
       continue;
     }
     const matchingIndex = standaloneSteps.findIndex(
@@ -287,7 +303,11 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
       arguments: call.arguments,
       ...(correlated?.stateBefore === undefined ? {} : { stateBefore: correlated.stateBefore }),
       ...(call.result === undefined ? {} : { result: call.result }),
-      ...(call.error === undefined ? {} : { error: call.error }),
+      ...(
+        call.error === undefined && !call.executed
+          ? { error: "TrueForge target tool call did not produce a successful terminal response." }
+          : call.error === undefined ? {} : { error: call.error }
+      ),
       ...(correlated?.stateAfter === undefined ? {} : { stateAfter: correlated.stateAfter }),
     });
   }
@@ -327,8 +347,20 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
     evaluation,
     recoveryEvidence,
   });
-  input.onSessionCompleted?.(session.id);
+  executionCompleted = true;
   return execution;
+  } catch (error) {
+    if (!executionCompleted) {
+      try {
+        await input.client.cancelSession(session.id);
+      } catch {
+        // Preserve the original execution failure; cancellation is best-effort cleanup.
+      }
+    }
+    throw error;
+  } finally {
+    input.onSessionCompleted?.(session.id);
+  }
 }
 
 export class TrueForgeExecutionAdapter {

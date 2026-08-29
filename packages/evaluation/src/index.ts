@@ -11,3 +11,4 @@ export * from "./trueforge-agents.js";
 export * from "./trueforge-client.js";
 export * from "./trueforge-doctor.js";
 export * from "./trueforge-events.js";
+export * from "./trueforge-safety.js";

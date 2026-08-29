@@ -136,9 +136,7 @@ export async function loadAssessment(
   }
 
   ready.sort(
-    options.defaultCandidates === undefined
-      ? (left, right) => left.priority - right.priority || freshness(right.result) - freshness(left.result)
-      : (left, right) => freshness(right.result) - freshness(left.result) || left.priority - right.priority,
+    (left, right) => freshness(right.result) - freshness(left.result) || left.priority - right.priority,
   );
   if (ready[0] !== undefined) {
     return ready[0].result;

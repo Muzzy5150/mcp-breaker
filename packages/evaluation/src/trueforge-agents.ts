@@ -2,8 +2,11 @@ import type { TrueForgeApi } from "@truefoundry/trueforge-sdk";
 import type { ToolPolicy } from "@mcp-breaker/shared";
 
 import type { TrueForgeAgentRecord, TrueForgeFacade } from "./trueforge-client.js";
+import { requireLoopbackTrueForgeUrl } from "./trueforge-safety.js";
 
-export const TRUEFORGE_BASE_URL = process.env.TRUEFORGE_BASE_URL ?? "http://localhost:8790";
+export const TRUEFORGE_BASE_URL = requireLoopbackTrueForgeUrl(
+  process.env.TRUEFORGE_BASE_URL ?? "http://localhost:8790",
+);
 export const TRUEFORGE_MODEL = process.env.TRUEFORGE_MODEL ?? "openai/gpt-5-6-terra";
 export const TRUEFORGE_CONNECTOR = process.env.TRUEFORGE_MCP_SERVER ?? "mcpbreakerdemo";
 export const TRUEFORGE_CONNECTOR_URL = "http://127.0.0.1:18880/mcp";

@@ -1,4 +1,5 @@
-import { DEMO_TOOL_NAMES } from "@mcp-breaker/demo-target";
+import { DEMO_TOOL_NAMES, DemoToolOutputSchemas, type DemoToolName } from "@mcp-breaker/demo-target";
+import { z } from "zod";
 
 import {
   SMOKE_AGENT_NAME,
@@ -10,6 +11,30 @@ import type { TrueForgeFacade } from "./trueforge-client.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isDemoToolName(value: string): value is DemoToolName {
+  return (DEMO_TOOL_NAMES as readonly string[]).includes(value);
+}
+
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalJson);
+  }
+  if (!isRecord(value)) {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(
+      ([key, entry]) => [key, canonicalJson(entry)],
+    ),
+  );
+}
+
+function schemaMatches(toolName: DemoToolName, actual: unknown): boolean {
+  return JSON.stringify(canonicalJson(actual)) === JSON.stringify(
+    canonicalJson(z.toJSONSchema(DemoToolOutputSchemas[toolName])),
+  );
 }
 
 export interface TrueForgeDoctorReport {
@@ -29,6 +54,7 @@ export interface TrueForgeDoctorReport {
   sandbox: { type: string; status: string; statusReason: string | null };
   toolNames: string[];
   missingOutputSchemas: string[];
+  invalidOutputSchemas: string[];
   messages: string[];
 }
 
@@ -50,6 +76,13 @@ export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueF
     .filter((tool) => typeof tool.name === "string" && !isRecord(tool.outputSchema))
     .map((tool) => String(tool.name))
     .sort();
+  const invalidOutputSchemas = tools
+    .filter((tool) => {
+      const name = typeof tool.name === "string" ? tool.name : "";
+      return isDemoToolName(name) && isRecord(tool.outputSchema) && !schemaMatches(name, tool.outputSchema);
+    })
+    .map((tool) => String(tool.name))
+    .sort();
   const capabilitiesRecord = isRecord(capabilities) ? capabilities : {};
   const sandboxCapability = isRecord(capabilitiesRecord.sandbox) ? capabilitiesRecord.sandbox : {};
   const authStatusRecord = connector !== undefined && isRecord(connector.authStatus) ? connector.authStatus : {};
@@ -60,7 +93,10 @@ export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueF
     connector: connector?.url === TRUEFORGE_CONNECTOR_URL,
     connectorAuthorized: authStatus === "not_required" || authStatus === "authorized",
     connectorTools: DEMO_TOOL_NAMES.every((name) => toolNames.includes(name)),
-    outputSchemas: missingOutputSchemas.length === 0 && tools.length === DEMO_TOOL_NAMES.length,
+    outputSchemas:
+      missingOutputSchemas.length === 0 &&
+      invalidOutputSchemas.length === 0 &&
+      tools.length === DEMO_TOOL_NAMES.length,
     sandbox: sandbox.type === "daytona" && sandbox.status === "ready",
     smokeAgentPreserved: agents.some((agent) => agent.name === SMOKE_AGENT_NAME),
   };
@@ -79,6 +115,7 @@ export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueF
     sandbox,
     toolNames,
     missingOutputSchemas,
+    invalidOutputSchemas,
     messages,
   };
 }

@@ -1,12 +1,18 @@
 /* eslint-disable @typescript-eslint/require-await -- async methods intentionally model the SDK facade. */
 import { getDeterministicDemoScenario } from "@mcp-breaker/attack-library";
 import { deriveCurrentDemoPolicy, generateRemediationPolicy } from "@mcp-breaker/breaker-core";
-import { DemoToolService, DEMO_TOOL_METADATA, DEMO_TOOL_NAMES } from "@mcp-breaker/demo-target";
+import {
+  DemoToolOutputSchemas,
+  DemoToolService,
+  DEMO_TOOL_METADATA,
+  DEMO_TOOL_NAMES,
+} from "@mcp-breaker/demo-target";
 import {
   executeLiveScenario,
   expandLivePolicyForObservedMutations,
   isLiveRemediationVerified,
   reconcileAgent,
+  requireLoopbackTrueForgeUrl,
   runLiveAssessment,
   runTrueForgeDoctor,
   targetAgentManifest,
@@ -18,6 +24,7 @@ import {
 } from "@mcp-breaker/evaluation";
 import { FindingSchema } from "@mcp-breaker/shared";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { createFinding, DeterministicClock, DeterministicIds } from "./helpers.js";
 
@@ -54,7 +61,11 @@ class FakeTrueForge implements TrueForgeFacade {
   }
 
   async listMcpTools(): Promise<readonly Record<string, unknown>[]> {
-    return DEMO_TOOL_NAMES.map((name) => ({ name, inputSchema: { type: "object" }, outputSchema: { type: "object" } }));
+    return DEMO_TOOL_NAMES.map((name) => ({
+      name,
+      inputSchema: { type: "object" },
+      outputSchema: z.toJSONSchema(DemoToolOutputSchemas[name]),
+    }));
   }
 
   async getSandboxProvider(): Promise<{ type: string; status: string; statusReason: string | null }> {
@@ -169,13 +180,141 @@ class FakeTrueForge implements TrueForgeFacade {
   }
 }
 
+class FailedToolTrueForge extends FakeTrueForge {
+  override async streamTurn(): Promise<AsyncIterable<TrueForgeStreamItem>> {
+    const timestamp = "2026-08-29T12:00:00.000Z";
+    const modelEvent = (id: string, callId: string, name: string, argumentsValue: unknown): TrueForgeStreamItem => ({
+      data: {
+        id,
+        type: "model.message",
+        createdAt: timestamp,
+        threadId: "main",
+        toolCalls: [{
+          id: callId,
+          type: "function",
+          function: { name, arguments: JSON.stringify(argumentsValue) },
+          toolInfo: { type: "mcp", name, serverName: "mcpbreakerdemo" },
+        }],
+      },
+    });
+    return iterable([
+      { data: { id: "failed-turn", type: "turn.created", createdAt: timestamp, turnId: "failed-turn" } },
+      modelEvent("failed-read-model", "failed-read", "read_file", { path: "tmp-report.csv" }),
+      {
+        data: {
+          id: "failed-read-response",
+          type: "tool.response",
+          createdAt: timestamp,
+          threadId: "main",
+          toolCallId: "failed-read",
+          content: JSON.stringify({ structuredContent: { file: { path: "tmp-report.csv" } } }),
+        },
+      },
+      modelEvent("failed-write-model", "failed-write", "write_file", { path: "tmp-report.csv", content: "changed" }),
+      {
+        data: {
+          id: "failed-write-response",
+          type: "tool.response",
+          createdAt: timestamp,
+          threadId: "main",
+          toolCallId: "failed-write",
+          content: JSON.stringify({ isError: true, content: [{ type: "text", text: "write failed" }] }),
+        },
+      },
+      { data: { id: "failed-done", type: "turn.done", createdAt: timestamp, state: { status: "done" } } },
+    ]);
+  }
+}
+
+class ApprovalLoopTrueForge extends FakeTrueForge {
+  turns = 0;
+  cancellations = 0;
+
+  override async streamTurn(): Promise<AsyncIterable<TrueForgeStreamItem>> {
+    this.turns += 1;
+    const suffix = String(this.turns);
+    const timestamp = "2026-08-29T12:00:00.000Z";
+    return iterable([
+      { data: { id: `loop-turn-${suffix}`, type: "turn.created", createdAt: timestamp, turnId: `loop-turn-${suffix}` } },
+      {
+        data: {
+          id: `loop-model-${suffix}`,
+          type: "model.message",
+          createdAt: timestamp,
+          threadId: "main",
+          toolCalls: [{
+            id: `loop-call-${suffix}`,
+            type: "function",
+            function: { name: "write_file", arguments: "{}" },
+            toolInfo: { type: "mcp", name: "write_file", serverName: "mcpbreakerdemo" },
+          }],
+        },
+      },
+      {
+        data: {
+          id: `loop-approval-${suffix}`,
+          type: "tool.approval_required",
+          createdAt: timestamp,
+          turnId: `loop-turn-${suffix}`,
+          threadId: "main",
+          toolCalls: [{ id: `loop-call-${suffix}` }],
+        },
+      },
+    ]);
+  }
+
+  override async cancelSession(): Promise<unknown> {
+    this.cancellations += 1;
+    return { state: "cancelled" };
+  }
+}
+
+class StreamFailureTrueForge extends FakeTrueForge {
+  cancellations = 0;
+
+  override async streamTurn(): Promise<AsyncIterable<TrueForgeStreamItem>> {
+    throw new Error("stream failed");
+  }
+
+  override async cancelSession(): Promise<unknown> {
+    this.cancellations += 1;
+    return { state: "cancelled" };
+  }
+}
+
 describe("TrueForge Stage 5 integration", () => {
+  it("rejects non-loopback TrueForge control-plane URLs", () => {
+    expect(requireLoopbackTrueForgeUrl("http://localhost:8790")).toBe("http://localhost:8790");
+    expect(requireLoopbackTrueForgeUrl("http://127.10.20.30:8790")).toBe("http://127.10.20.30:8790");
+    expect(requireLoopbackTrueForgeUrl("http://[::1]:8790")).toBe("http://[::1]:8790");
+    expect(() => requireLoopbackTrueForgeUrl("https://trueforge.example.com")).toThrow(/loopback/i);
+    expect(() => requireLoopbackTrueForgeUrl("http://token@localhost:8790")).toThrow(/credentials/i);
+  });
+
   it("uses the SDK delta merger and records tool event correlation", () => {
     const recorder = new TrueForgeEventRecorder();
     recorder.ingest({ data: { id: "message-1", type: "model.message", createdAt: "2026-08-29T12:00:00.000Z", threadId: "main", content: "Hello" } }, "turn-1");
     recorder.ingest({ data: { id: "message-1", type: "model.message.delta", threadId: "main", content: " world" } }, "turn-1");
     expect(recorder.finalResponse).toBe("Hello world");
     expect(recorder.events.map((event) => event.sequenceNumber)).toEqual([1, 2]);
+  });
+
+  it("deduplicates persisted terminal events and their approval side effects", () => {
+    const recorder = new TrueForgeEventRecorder();
+    const item = {
+      data: {
+        id: "approval-once",
+        type: "tool.approval_required",
+        createdAt: "2026-08-29T12:00:00.000Z",
+        turnId: "turn-once",
+        threadId: "main",
+        toolCalls: [{ id: "call-once" }],
+      },
+    } satisfies TrueForgeStreamItem;
+    recorder.ingest(item, "turn-once");
+    recorder.ingest(item, "turn-once");
+    expect(recorder.events).toHaveLength(1);
+    expect(recorder.pendingApprovals).toHaveLength(1);
   });
 
   it("unwraps the TrueForge system call_tool wrapper into MCP evidence", () => {
@@ -327,6 +466,63 @@ describe("TrueForge Stage 5 integration", () => {
     const report = await runTrueForgeDoctor(fake);
     expect(report.ok).toBe(true);
     expect(report.missingOutputSchemas).toEqual([]);
+    expect(report.invalidOutputSchemas).toEqual([]);
+    const invalid = new FakeTrueForge(new DemoToolService(), [
+      { id: "smoke", name: "mcp-breaker-live-test", manifest: targetAgentManifest([]) },
+    ]);
+    invalid.listMcpTools = async () => DEMO_TOOL_NAMES.map((name) => ({
+      name,
+      inputSchema: { type: "object" },
+      outputSchema: name === "read_issue" ? {} : z.toJSONSchema(DemoToolOutputSchemas[name]),
+    }));
+    const invalidReport = await runTrueForgeDoctor(invalid);
+    expect(invalidReport.ok).toBe(false);
+    expect(invalidReport.invalidOutputSchemas).toContain("read_issue");
+  });
+
+  it("preserves failed MCP responses as execution errors", async () => {
+    const service = new DemoToolService();
+    const execution = await executeLiveScenario({
+      client: new FailedToolTrueForge(service),
+      service,
+      agent: { id: "agent-baseline", name: "mcp-breaker-target-baseline", manifest: targetAgentManifest([]) },
+      scenario: getDeterministicDemoScenario("scenario-unauthorized-write-unsafe"),
+      runId: "run-failed-call",
+      clock: new DeterministicClock(),
+      ids: new DeterministicIds(),
+    });
+    expect(execution.evaluation.status).toBe("EXECUTION_ERROR");
+    expect(execution.trace.steps.find((step) => step.toolName === "write_file")?.error).toContain("write failed");
+  });
+
+  it("cancels and releases tracking when a live stream fails", async () => {
+    const service = new DemoToolService();
+    const fake = new StreamFailureTrueForge(service);
+    const completed: string[] = [];
+    await expect(executeLiveScenario({
+      client: fake,
+      service,
+      agent: { id: "agent-baseline", name: "mcp-breaker-target-baseline", manifest: targetAgentManifest([]) },
+      scenario: getDeterministicDemoScenario("scenario-unauthorized-write-unsafe"),
+      runId: "run-stream-failure",
+      onSessionCompleted: (sessionId) => completed.push(sessionId),
+    })).rejects.toThrow("stream failed");
+    expect(fake.cancellations).toBe(1);
+    expect(completed).toEqual(["session-1"]);
+  });
+
+  it("cancels instead of evaluating a truncated approval continuation", async () => {
+    const service = new DemoToolService();
+    const fake = new ApprovalLoopTrueForge(service);
+    await expect(executeLiveScenario({
+      client: fake,
+      service,
+      agent: { id: "agent-hardened", name: "mcp-breaker-target-hardened", manifest: targetAgentManifest(["write_file"]) },
+      scenario: getDeterministicDemoScenario("scenario-unauthorized-write-unsafe"),
+      runId: "run-approval-limit",
+    })).rejects.toThrow(/continuation limit/i);
+    expect(fake.turns).toBe(8);
+    expect(fake.cancellations).toBe(1);
   });
 
   it("evaluates only actual fake SDK tool events and correlated state mutations", async () => {

@@ -91,6 +91,7 @@ export class TrueForgeEventRecorder {
   readonly #events: TrueForgeEventEvidence[] = [];
   readonly #toolCalls = new Map<string, MutableToolCall>();
   readonly #messages = new Map<string, TrueForgeApi.ModelMessageEvent>();
+  readonly #seenTerminalEventIds = new Set<string>();
   readonly #approvals: LiveApprovalEvidence[] = [];
   readonly #deniedToolCallIds = new Set<string>();
   readonly #pendingApprovals: PendingApproval[] = [];
@@ -206,6 +207,12 @@ export class TrueForgeEventRecorder {
     const eventId = stringField(event, "id");
     if (type === undefined || eventId === undefined) {
       return;
+    }
+    if (type !== "model.message.delta") {
+      if (this.#seenTerminalEventIds.has(eventId)) {
+        return;
+      }
+      this.#seenTerminalEventIds.add(eventId);
     }
     const eventTurnId = stringField(event, "turnId") ?? fallbackTurnId ?? this.#turnIds.at(-1);
     if (type === "turn.created") {

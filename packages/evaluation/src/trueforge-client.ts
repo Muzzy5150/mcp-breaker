@@ -1,5 +1,7 @@
 import { TrueForge, type TrueForgeApi } from "@truefoundry/trueforge-sdk";
 
+import { requireLoopbackTrueForgeUrl } from "./trueforge-safety.js";
+
 export const TRUEFORGE_SDK_VERSION = "0.1.3";
 
 export interface TrueForgeAgentRecord {
@@ -70,7 +72,11 @@ export class OfficialTrueForgeFacade implements TrueForgeFacade {
   readonly #client: TrueForge;
 
   constructor(baseUrl: string, token = process.env.TRUEFORGE_TOKEN) {
-    this.#client = new TrueForge({ baseUrl, ...(token === undefined ? {} : { token }), timeoutInSeconds: 600 });
+    this.#client = new TrueForge({
+      baseUrl: requireLoopbackTrueForgeUrl(baseUrl),
+      ...(token === undefined ? {} : { token }),
+      timeoutInSeconds: 600,
+    });
   }
 
   async getCapabilities(): Promise<unknown> {
