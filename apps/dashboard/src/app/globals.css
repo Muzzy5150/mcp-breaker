@@ -176,11 +176,13 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .count-chip-pass { border-color: #285d46; background: #0b2119; color: var(--pass); }
 .tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .tool-card { min-width: 0; padding: 16px; }
-.tool-card:hover { border-color: #59333d; box-shadow: 0 14px 34px rgba(0,0,0,.3), 0 0 24px rgba(184,79,100,.07); transform: translateY(-2px); }
-.tool-card:hover::after { background: linear-gradient(130deg, rgba(255,255,255,.04), transparent 40%, rgba(255,100,120,.09)); }
+.tool-card:hover { border-color: #3b3b41; box-shadow: 0 14px 34px rgba(0,0,0,.3), 0 0 20px rgba(255,255,255,.025); transform: translateY(-2px); }
+.tool-card:hover::after { background: linear-gradient(130deg, rgba(255,255,255,.045), transparent 42%, rgba(255,255,255,.025)); }
 .tool-card-affected { border-color: #59333d; box-shadow: inset 3px 0 0 #b84f64, 0 9px 26px rgba(0,0,0,.2); }
 .tool-card-affected::before, .tool-card-affected::after { opacity: 1; }
 .tool-card-affected::after { background: linear-gradient(130deg, rgba(255,255,255,.035), transparent 38%, rgba(255,100,120,.075)); }
+.tool-card-affected:hover { border-color: #703342; box-shadow: inset 3px 0 0 #d85c73, 0 14px 34px rgba(0,0,0,.3), 0 0 24px rgba(184,79,100,.09); }
+.tool-card-affected:hover::after { background: linear-gradient(130deg, rgba(255,255,255,.04), transparent 40%, rgba(255,100,120,.1)); }
 .tool-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .tool-title-row > code { color: #e6e6e8; font-size: .83rem; font-weight: 700; overflow-wrap: anywhere; }
 .finding-flag, .clear-flag { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: .65rem; font-weight: 700; text-transform: uppercase; }
