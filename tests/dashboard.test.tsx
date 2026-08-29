@@ -91,7 +91,36 @@ describe("Stage 3 dashboard rendering", () => {
     for (const scenario of safeControls) {
       expect(dashboardHtml).toContain(scenario.title);
     }
-    expect(dashboardHtml).toContain("4 passed");
+    expect(dashboardHtml).toContain("4 of 4 passed");
+    expect(dashboardHtml).not.toContain("safe-card-nonpass");
+  });
+
+  it("counts and styles only actual PASS executions as safe controls", () => {
+    const failedControlId = DETERMINISTIC_DEMO_SCENARIOS.find(
+      (scenario) => scenario.controlType === "SAFE_CONTROL",
+    )?.id;
+    const degradedReport = DeterministicAssessmentReportSchema.parse({
+      ...report,
+      executions: report.executions.map((execution) =>
+        execution.scenarioId === failedControlId && execution.replayOfExecutionId === undefined
+          ? {
+              ...execution,
+              evaluation: {
+                status: "EXECUTION_ERROR",
+                summary: "The control execution failed.",
+                violations: [],
+              },
+            }
+          : execution,
+      ),
+    });
+    const html = renderToStaticMarkup(<SecurityDashboard report={degradedReport} />);
+
+    expect(html).toContain("3 of 4 passed");
+    expect(html).toContain("safe-card-nonpass");
+    expect(html).toContain("safe-status-nonpass");
+    expect(html).toContain("EXECUTION ERROR");
+    expect(html).not.toContain("4 of 4 passed");
   });
 
   it("marks a matrix cell FAIL only when a verified finding matches the tool and category", () => {
@@ -101,6 +130,42 @@ describe("Stage 3 dashboard rendering", () => {
     expect(deleteRow?.statuses.DESTRUCTIVE_ACTION).toBe("FAIL");
     expect(readRow?.statuses.INDIRECT_PROMPT_INJECTION).toBe("PASS");
     expect(readRow?.statuses.CONFUSED_DEPUTY).toBe("NOT_TESTED");
+  });
+
+  it.each([
+    ["CANDIDATE_FINDING", "CANDIDATE"],
+    ["INCONCLUSIVE", "INCONCLUSIVE"],
+    ["EXECUTION_ERROR", "ERROR"],
+  ] as const)("does not present a %s execution as PASS coverage", (evaluationStatus, matrixStatus) => {
+    const targetTool = "merge_pull_request";
+    const targetExecution = report.executions.find(
+      (execution) =>
+        execution.replayOfExecutionId === undefined &&
+        execution.trace.steps.some((step) => step.toolName === targetTool),
+    );
+    expect(targetExecution).toBeDefined();
+    const degradedReport = DeterministicAssessmentReportSchema.parse({
+      ...report,
+      verifiedFindings: [],
+      executions: report.executions.map((execution) =>
+        execution.executionId === targetExecution?.executionId
+          ? {
+              ...execution,
+              evaluation: {
+                status: evaluationStatus,
+                summary: `Deliberate ${evaluationStatus} matrix fixture.`,
+                violations: [],
+              },
+            }
+          : execution,
+      ),
+    });
+    const row = buildRiskMatrix(degradedReport, DEMO_TOOL_METADATA).find(
+      (candidate) => candidate.tool.name === targetTool,
+    );
+
+    expect(row?.statuses.INDIRECT_PROMPT_INJECTION).toBe(matrixStatus);
+    expect(row?.statuses.INDIRECT_PROMPT_INJECTION).not.toBe("PASS");
   });
 
   it("renders an explicit zero-findings state", () => {
