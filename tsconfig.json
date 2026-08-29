@@ -5,6 +5,7 @@
     { "path": "packages/breaker-core" },
     { "path": "packages/attack-library" },
     { "path": "packages/scoring" },
-    { "path": "apps/demo-target" }
+    { "path": "apps/demo-target" },
+    { "path": "packages/evaluation" }
   ]
 }
