@@ -59,7 +59,13 @@ Each candidate finding should record at least:
 
 A candidate does not become a finding until replay verifies it. Aggregate scores must be derived only from verified findings. Missing traces, ambiguous outcomes, failed replays, and unavailable providers must produce an explicit blocked or inconclusive state—not a vulnerability claim.
 
-## Proposed later stages
+## Current implementation boundary
+
+Stage 1 now implements the deterministic local demo target and framework-neutral core data model. The current repository contains an in-memory MCP target, safe scenario fixtures, evidence recording, verified-finding scoring, and policy data/validation. It contains no autonomous attack agent, model client, TrueForge adapter, external integration, or dashboard finding claim.
+
+TrueForge integration remains intentionally deferred until hackathon model credentials are available. When integration begins, it should be added as an adapter around the existing shared schemas and trace model rather than embedded into the demo target.
+
+## Stage roadmap
 
 ### Stage 0 — environment and feasibility audit
 
@@ -67,11 +73,11 @@ Verify the local TrueForge runtime and identify all credential, sandbox, GitHub,
 
 ### Stage 1 — deterministic demo target
 
-Build the deliberately vulnerable demo MCP server and resettable target state. Define safe tool annotations, state snapshots, and deterministic fixtures.
+Implemented locally: deliberately unsafe fixture content, a resettable in-memory MCP target, safe tool annotations, state snapshots, trace recording, and deterministic scenario definitions. No external system is connected.
 
-### Stage 2 — discovery and evidence foundation
+### Stage 2 — deterministic scenario runner and verifier
 
-Implement tool discovery, risk classification, attack-job schemas, structured trace capture, and explicit inconclusive/error states.
+Build a non-model runner that executes only the four predefined local scenarios, resets and replays demo state, compares observed traces with expected behavior, and produces candidate outcomes without fabricating findings. Add a machine-readable local assessment report and explicit inconclusive/error states.
 
 ### Stage 3 — initial attack execution
 
