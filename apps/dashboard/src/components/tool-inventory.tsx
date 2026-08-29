@@ -29,7 +29,10 @@ export function ToolInventory({
         {tools.map((tool) => {
           const hasFinding = affected.has(tool.name);
           return (
-            <article className={`tool-card${hasFinding ? " tool-card-affected" : ""}`} key={tool.name}>
+            <article
+              className={`bento-card tool-card${hasFinding ? " bento-card-featured tool-card-affected" : ""}`}
+              key={tool.name}
+            >
               <div className="tool-title-row">
                 <code>{tool.name}</code>
                 {hasFinding ? (
