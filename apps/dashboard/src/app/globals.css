@@ -43,6 +43,7 @@
 html { scroll-behavior: smooth; }
 body {
   margin: 0;
+  overflow-x: clip;
   background:
     linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px),
     var(--bg);
@@ -79,7 +80,7 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .demo-label > span { width: 5px; height: 5px; background: var(--pass); box-shadow: 0 0 0 2px rgba(117, 216, 163, .1); }
 .dashboard-main { width: min(1440px, 100%); margin: 0 auto; padding: 0 clamp(20px, 4vw, 64px) 80px; }
 .dashboard-hero { position: relative; isolation: isolate; padding-top: clamp(64px, 8vw, 108px); }
-.hero-light-field { position: absolute; inset: 0 auto auto 50%; z-index: -1; width: min(1160px, 100vw); height: 560px; overflow: hidden; pointer-events: none; transform: translateX(-50%); opacity: .72; }
+.hero-light-field { position: absolute; inset: 0 auto auto 50%; z-index: -1; width: 100vw; height: 560px; overflow: hidden; pointer-events: none; transform: translateX(-50%); opacity: .72; }
 .hero-light { position: absolute; top: -510px; left: -110px; height: 980px; border-radius: 999px; transform: rotate(-42deg); transform-origin: center; }
 .hero-light-wide { width: 460px; background: radial-gradient(68% 69% at 55% 31%, rgba(255,255,255,.085) 0, rgba(255,255,255,.018) 50%, transparent 80%); }
 .hero-light-narrow { left: 154px; width: 150px; background: radial-gradient(50% 50% at 50% 50%, rgba(255,255,255,.055) 0, rgba(255,255,255,.012) 78%, transparent 100%); }
