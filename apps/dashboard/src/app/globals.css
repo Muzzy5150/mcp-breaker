@@ -59,7 +59,6 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .app-shell { min-height: 100vh; }
 .topbar {
   min-height: 68px;
-  border-bottom: 1px dashed #2b2b2f;
   position: sticky;
   top: 0;
   z-index: 20;
