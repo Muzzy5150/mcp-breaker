@@ -8,6 +8,16 @@ import {
   scenarioForFinding,
 } from "../lib/dashboard-data";
 import { SectionHeading } from "./section-heading";
+import { ServerManagementTable } from "./ui/server-management-table";
+
+const findingColumns = [
+  { key: "number", label: "No.", className: "finding-column-number" },
+  { key: "finding", label: "Finding", className: "finding-column-title" },
+  { key: "target", label: "Category / tool", className: "finding-column-target" },
+  { key: "severity", label: "Severity", className: "finding-column-severity" },
+  { key: "replay", label: "Replay", className: "finding-column-replay" },
+  { key: "control", label: "", className: "finding-column-control" },
+] as const;
 
 function EvidenceStep({ step, replay = false }: { step: ExecutionStep; replay?: boolean }) {
   return (
@@ -33,7 +43,15 @@ function EvidenceStep({ step, replay = false }: { step: ExecutionStep; replay?: 
   );
 }
 
-function FindingDetail({ report, finding }: { report: DeterministicAssessmentReport; finding: Finding }) {
+function FindingDetail({
+  report,
+  finding,
+  index,
+}: {
+  report: DeterministicAssessmentReport;
+  finding: Finding;
+  index: number;
+}) {
   const scenario = scenarioForFinding(report, finding);
   const initial = executionForTrace(report, finding.evidence.executionTraceId);
   const replay = executionForTrace(report, finding.evidence.replayExecutionTraceId);
@@ -44,11 +62,16 @@ function FindingDetail({ report, finding }: { report: DeterministicAssessmentRep
   return (
     <details className="finding-card">
       <summary>
-        <span className={`severity-badge badge-${finding.severity.toLowerCase()}`}>{finding.severity}</span>
+        <span className="finding-number">{String(index + 1).padStart(2, "0")}</span>
         <span className="finding-summary-copy">
           <strong>{title}</strong>
-          <span>{CATEGORY_LABELS[finding.category]} · <code>{finding.targetTool}</code></span>
+          <span className="finding-mobile-context">{CATEGORY_LABELS[finding.category]} · <code>{finding.targetTool}</code></span>
         </span>
+        <span className="finding-target">
+          <span>{CATEGORY_LABELS[finding.category]}</span>
+          <code>{finding.targetTool}</code>
+        </span>
+        <span className={`severity-badge badge-${finding.severity.toLowerCase()}`}>{finding.severity}</span>
         <span className="reproduced-chip"><RotateCcw aria-hidden="true" size={13} /> {finding.replayResult.status}</span>
         <ChevronDown aria-hidden="true" className="finding-chevron" size={18} />
       </summary>
@@ -103,12 +126,20 @@ export function FindingsExplorer({ report }: { report: DeterministicAssessmentRe
         title="Findings explorer"
         description="Every item below was promoted from a captured candidate only after a clean-state replay matched it."
         aside={<span className="count-chip count-chip-danger">{report.verifiedFindings.length} verified</span>}
+        headingId="findings-heading"
       />
-      <div className="finding-list" id="findings-heading">
+      <ServerManagementTable
+        title="Verified runtime findings"
+        description="Clean-state replay · captured mutation evidence"
+        summary={`${report.verifiedFindings.length} verified`}
+        columns={findingColumns}
+        className="finding-list"
+        tone="danger"
+      >
         {report.verifiedFindings.length === 0 ? (
           <div className="empty-panel"><CheckCircle2 aria-hidden="true" size={24} /><h3>No verified findings</h3><p>The assessment completed without replay-verified unsafe behavior.</p></div>
-        ) : report.verifiedFindings.map((finding) => <FindingDetail finding={finding} key={finding.stableId} report={report} />)}
-      </div>
+        ) : report.verifiedFindings.map((finding, index) => <FindingDetail finding={finding} index={index} key={finding.stableId} report={report} />)}
+      </ServerManagementTable>
     </section>
   );
 }

@@ -50,6 +50,7 @@ describe("Stage 3 dashboard rendering", () => {
     expect(dashboardHtml).toContain("Verify every failure.");
     expect(dashboardHtml).toContain(report.runId);
     expect(dashboardHtml).toContain("Demo Developer Agent");
+    expect(dashboardHtml).toContain("bento-card bento-card-featured score-panel");
   });
 
   it("renders finding and severity counts from the assessment", () => {
@@ -60,9 +61,8 @@ describe("Stage 3 dashboard rendering", () => {
   });
 
   it("renders every tool from the Stage 1 metadata source", () => {
-    expect(dashboardHtml).toContain("management-table-shell tool-grid");
-    expect(dashboardHtml).toContain("Observed tool surface");
-    expect(dashboardHtml).toContain("bento-card bento-card-featured score-panel");
+    expect(dashboardHtml).toContain("class=\"tool-grid\"");
+    expect(dashboardHtml).toContain("class=\"tool-card");
     for (const tool of DEMO_TOOL_METADATA) {
       expect(dashboardHtml).toContain(tool.name);
       expect(dashboardHtml).toContain(tool.riskClasses[0]);
@@ -70,6 +70,8 @@ describe("Stage 3 dashboard rendering", () => {
   });
 
   it("renders actual finding details and distinct original/replay evidence", () => {
+    expect(dashboardHtml).toContain("management-table-shell management-table-danger finding-list");
+    expect(dashboardHtml).toContain("Verified runtime findings");
     for (const finding of report.verifiedFindings) {
       expect(dashboardHtml).toContain(finding.originalUserIntent);
       expect(dashboardHtml).toContain(finding.untrustedContent);

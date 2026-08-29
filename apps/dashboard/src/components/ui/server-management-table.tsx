@@ -15,6 +15,7 @@ interface ServerManagementTableProps {
   columns: readonly ManagementColumn[];
   children: ReactNode;
   className?: string;
+  tone?: "default" | "danger";
 }
 
 export function ServerManagementTable({
@@ -24,9 +25,10 @@ export function ServerManagementTable({
   columns,
   children,
   className,
+  tone = "default",
 }: ServerManagementTableProps) {
   return (
-    <div className={cn("management-table-shell", className)}>
+    <div className={cn("management-table-shell", tone === "danger" && "management-table-danger", className)}>
       <div className="management-table-toolbar">
         <div className="management-table-title">
           <span aria-hidden="true" className="management-live-dot" />
@@ -37,21 +39,12 @@ export function ServerManagementTable({
         </div>
         <span className="management-summary">{summary}</span>
       </div>
-      <div className="management-table-scroll">
-        <table className="management-table">
-          <caption className="sr-only">{title}</caption>
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th className={column.className} key={column.key} scope="col">
-                  {column.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>{children}</tbody>
-        </table>
+      <div className="management-table-columns" aria-hidden="true">
+        {columns.map((column) => (
+          <span className={column.className} key={column.key}>{column.label}</span>
+        ))}
       </div>
+      <div className="management-table-rows">{children}</div>
     </div>
   );
 }
