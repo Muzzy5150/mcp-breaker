@@ -92,7 +92,47 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .product-thesis { max-width: 680px; margin: 24px auto 0; color: #aaaab1; font-size: clamp(1rem, 1.7vw, 1.22rem); line-height: 1.6; text-wrap: balance; }
 .run-id { max-width: 100%; margin: 20px auto 0; overflow: hidden; color: #6f6f76; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
 .run-id code { color: #cacacf; }
-.demo-control-panel { width: min(1080px, 100%); margin: 36px auto 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 7px; background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 44%), var(--surface); box-shadow: 0 22px 54px rgba(0,0,0,.32); }
+.mcp-connect-panel { width: min(1080px, 100%); margin: 36px auto 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 7px; background: linear-gradient(145deg, rgba(255,255,255,.035), transparent 44%), var(--surface); box-shadow: 0 22px 54px rgba(0,0,0,.32); text-align: left; }
+.mcp-connect-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; padding: 22px 24px 18px; background-image: radial-gradient(circle at center, rgba(255,255,255,.042) 1px, transparent 1px); background-size: 5px 5px; }
+.mcp-connect-heading h2 { margin: 9px 0 4px; font-size: clamp(1.4rem, 2.3vw, 1.9rem); letter-spacing: -.04em; }
+.mcp-connect-heading p:last-child { max-width: 650px; margin: 0; color: #a9a9b0; font-size: .82rem; line-height: 1.5; }
+.mcp-connect-heading > span { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; margin-top: 2px; border: 1px solid #51472b; border-radius: 3px; padding: 7px 9px; background: #17140b; color: #c7b676; font-family: "SFMono-Regular", Consolas, monospace; font-size: .58rem; letter-spacing: .035em; }
+.mcp-connect-form { padding: 0 24px 22px; }
+.mcp-connect-form > label { display: block; margin-bottom: 7px; color: #d8d8dc; font-size: .68rem; font-weight: 750; letter-spacing: .035em; }
+.mcp-url-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; }
+.mcp-url-row input { min-width: 0; height: 42px; border: 1px solid #45454c; border-radius: 4px; outline: 0; background: #070708; padding: 0 13px; color: #ededf0; font-family: "SFMono-Regular", Consolas, monospace; font-size: .75rem; }
+.mcp-url-row input:focus { border-color: #85858d; box-shadow: 0 0 0 3px rgba(255,255,255,.055); }
+.mcp-url-row button, .mcp-run-assessment { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 4px; padding: 9px 14px; cursor: pointer; font: inherit; font-size: .7rem; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+.mcp-url-row button:disabled, .mcp-run-assessment:disabled { cursor: not-allowed; opacity: .5; }
+.mcp-use-demo-button { border: 1px solid #3e3e45; background: #111113; color: #d1d1d6; }
+.mcp-use-demo-button:not(:disabled):hover { border-color: #62626a; background: #171719; }
+.mcp-url-help { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; color: #77777f; font-size: .61rem; }
+.mcp-url-help strong { color: #9999a1; font-weight: 600; text-align: right; }
+.mcp-connect-error { margin: 0 24px 22px !important; }
+.mcp-inspection-result { border-top: 1px solid var(--line); background: #080809; padding: 18px 24px 22px; }
+.mcp-inspection-summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.mcp-inspection-summary > div { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: start; gap: 6px 12px; }
+.mcp-connected-badge { display: inline-flex; align-items: center; gap: 6px; color: var(--pass); font-family: "SFMono-Regular", Consolas, monospace; font-size: .58rem; font-weight: 800; letter-spacing: .08em; }
+.mcp-connected-badge > span { width: 6px; height: 6px; border-radius: 50%; background: var(--pass); box-shadow: 0 0 10px rgba(117,216,163,.55); }
+.mcp-inspection-summary strong { color: #e2e2e5; font-size: .84rem; }
+.mcp-inspection-summary small { grid-column: 2; color: #8d8d95; font-size: .65rem; }
+.mcp-inspection-summary > code { max-width: 45%; overflow: hidden; color: #8d8d95; font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-discovered-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin-top: 14px; border: 1px solid var(--line); background: var(--line); }
+.mcp-discovered-tools article { min-width: 0; padding: 11px 12px; background: #0b0b0c; }
+.mcp-discovered-tools article > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.mcp-discovered-tools code { overflow: hidden; color: #e0e0e4; font-size: .66rem; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-risk-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
+.mcp-risk-list span { border: 1px solid #3e3e45; border-radius: 2px; padding: 2px 4px; color: #9b9ba3; font-family: "SFMono-Regular", Consolas, monospace; font-size: .46rem; letter-spacing: .04em; }
+.mcp-discovered-tools p { margin: 8px 0 0; color: #7e7e86; font-size: .59rem; line-height: 1.4; }
+.mcp-tool-contract { margin-top: 9px; border-top: 1px solid #242427; padding-top: 7px; }
+.mcp-tool-contract summary { cursor: pointer; color: #9b9ba3; font-family: "SFMono-Regular", Consolas, monospace; font-size: .52rem; letter-spacing: .035em; }
+.mcp-tool-contract[open] summary { color: #d0d0d4; }
+.mcp-tool-contract > div { margin-top: 8px; }
+.mcp-tool-contract strong { display: block; margin-bottom: 4px; color: #85858d; font-size: .5rem; letter-spacing: .06em; text-transform: uppercase; }
+.mcp-tool-contract pre { max-height: 150px; margin: 0; overflow: auto; border: 1px solid #29292d; border-radius: 2px; background: #060607; padding: 7px; color: #adadb4; font-family: "SFMono-Regular", Consolas, monospace; font-size: .49rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.mcp-run-assessment { width: 100%; margin-top: 12px; }
+.mcp-inspection-note { margin: 12px 0 0; color: #85858d; font-size: .64rem; }
+.demo-control-panel { width: min(1080px, 100%); margin: 14px auto 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 7px; background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 44%), var(--surface); box-shadow: 0 22px 54px rgba(0,0,0,.32); }
 .demo-control-main { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 30px; padding: 24px; background-image: radial-gradient(circle at center, rgba(255,255,255,.042) 1px, transparent 1px); background-size: 5px 5px; }
 .demo-control-copy h2 { margin: 10px 0 4px; font-size: clamp(1.35rem, 2.2vw, 1.8rem); letter-spacing: -.035em; }
 .demo-control-copy > p:last-of-type { max-width: 680px; margin: 0; color: #a9a9b0; font-size: .84rem; }
@@ -454,6 +494,10 @@ footer span:first-child { color: #d8d8dc; font-weight: 700; letter-spacing: .06e
   .hero-product-surface { transform: none; }
   .overview-grid { grid-template-columns: 1fr; }
   .demo-control-main { grid-template-columns: 1fr; }
+  .mcp-connect-heading { flex-direction: column; gap: 12px; }
+  .mcp-url-row { grid-template-columns: 1fr 1fr; }
+  .mcp-url-row input { grid-column: 1 / -1; }
+  .mcp-discovered-tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .job-progress { grid-template-columns: repeat(3, 1fr); }
   .job-progress li:nth-child(3) { border-right: 0; }
   .job-progress li:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
@@ -481,6 +525,17 @@ footer span:first-child { color: #d8d8dc; font-weight: 700; letter-spacing: .06e
   .hero-product-surface { padding: 5px; border-radius: 5px; }
   .run-id { width: 100%; }
   .demo-control-main { padding: 18px; }
+  .mcp-connect-heading { padding: 18px 18px 14px; }
+  .mcp-connect-heading > span { width: 100%; }
+  .mcp-connect-form { padding: 0 18px 18px; }
+  .mcp-url-row { grid-template-columns: 1fr; }
+  .mcp-url-row input { grid-column: auto; }
+  .mcp-url-help { align-items: flex-start; flex-direction: column; }
+  .mcp-url-help strong { text-align: left; }
+  .mcp-inspection-result { padding: 16px 18px 18px; }
+  .mcp-inspection-summary { align-items: flex-start; flex-direction: column; }
+  .mcp-inspection-summary > code { max-width: 100%; }
+  .mcp-discovered-tools { grid-template-columns: 1fr; }
   .demo-target-grid, .readiness-grid { grid-template-columns: 1fr; }
   .readiness-grid div { border-right: 0; border-bottom: 1px solid var(--line) !important; }
   .readiness-grid div:last-child { border-bottom: 0 !important; }

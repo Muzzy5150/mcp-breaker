@@ -6,6 +6,8 @@ import { Check, Circle, LoaderCircle, Play, RotateCcw, ShieldCheck, Square } fro
 
 import type { ManagedDemoJobSnapshot, ManagedDemoJobStatus } from "@mcp-breaker/evaluation";
 
+import { McpConnectPanel } from "./mcp-connect-panel";
+
 const endpoints = {
   assessment: "/api/demo-assessment/start",
   cancel: "/api/demo-assessment/cancel",
@@ -123,7 +125,13 @@ export function DemoAssessmentControls({ initialState }: { initialState: Managed
   ];
 
   return (
-    <section className="demo-control-panel" aria-labelledby="demo-control-heading">
+    <>
+      <McpConnectPanel
+        assessmentDisabled={!canLaunch}
+        assessmentActive={active}
+        onRunAssessment={() => { void mutate(endpoints.assessment); }}
+      />
+      <section className="demo-control-panel" aria-labelledby="demo-control-heading">
       <div className="demo-control-main">
         <div className="demo-control-copy">
           <p className="section-kicker"><ShieldCheck aria-hidden="true" size={15} /> Managed website demo</p>
@@ -199,6 +207,7 @@ export function DemoAssessmentControls({ initialState }: { initialState: Managed
           </div>
         ) : null}
       </div>
-    </section>
+      </section>
+    </>
   );
 }
