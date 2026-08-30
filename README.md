@@ -9,7 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="https://mcp-breaker.vercel.app"><img alt="Live demo" src="https://img.shields.io/badge/demo-live-22c55e?style=for-the-badge" /></a>
   <a href="https://github.com/Muzzy5150/mcp-breaker"><img alt="GitHub repository" src="https://img.shields.io/badge/github-repository-181717?style=for-the-badge&logo=github" /></a>
   <img alt="Tests" src="https://img.shields.io/badge/tests-104%20passing-34d399?style=for-the-badge" />
 </p>
@@ -21,12 +20,9 @@
   <img alt="Model Context Protocol" src="https://img.shields.io/badge/MCP-2.0-8B5CF6?style=flat-square" />
   <img alt="TrueForge" src="https://img.shields.io/badge/TrueForge-Live%20Evaluation-F97316?style=flat-square" />
   <img alt="Vitest" src="https://img.shields.io/badge/Vitest-4.1-6E9F18?style=flat-square&logo=vitest&logoColor=white" />
-  <img alt="Vercel" src="https://img.shields.io/badge/Vercel-Deployed-000000?style=flat-square&logo=vercel&logoColor=white" />
 </p>
 
 <p align="center">
-  <a href="https://mcp-breaker.vercel.app">Live Showcase</a>
-  ·
   <a href="#what-it-does">Features</a>
   ·
   <a href="#how-it-works">How It Works</a>
@@ -47,7 +43,7 @@ MCP Breaker is a security-evaluation platform for AI agents with MCP tool access
 Verified findings feed a deterministic least-privilege policy engine. MCP Breaker then reruns the same attacks against the hardened policy and records whether each unsafe action was blocked, approval-gated, or constrained to a sandbox.
 
 > [!NOTE]
-> The public Vercel site is a UI showcase. MCP inspection, TrueForge execution, generated evidence, and policy retests remain intentionally local because the demo target and control plane bind only to loopback addresses.
+> The interactive demo runs locally. MCP inspection, TrueForge execution, generated evidence, and policy retests remain intentionally loopback-only because the demo target and control plane bind only to local addresses.
 
 ## What It Does
 
@@ -118,7 +114,6 @@ The hardening view explains each effective rule change and compares the current 
 | Validation | Zod schemas at artifact and policy boundaries |
 | Testing | Vitest, TypeScript project references, ESLint |
 | Repository | npm workspaces monorepo |
-| Hosting | Vercel for the public UI showcase |
 
 ## Repository Structure
 

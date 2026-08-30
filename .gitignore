@@ -17,4 +17,3 @@ artifacts/demo-hardening.json
 artifacts/live-assessment.json
 artifacts/live-hardening.json
 apps/dashboard/next-env.d.ts
-.vercel
