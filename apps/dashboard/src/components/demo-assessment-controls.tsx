@@ -39,6 +39,7 @@ export function DemoAssessmentControls({ initialState }: { initialState: Managed
   const [requestPending, setRequestPending] = useState(false);
   const completedJob = useRef(initialState.status === "COMPLETED" ? initialState.jobId : undefined);
   const active = activeStatuses.has(job.status);
+  const runningOrCleaning = active || job.cleanupPending === true;
 
   useEffect(() => {
     let disposed = false;
@@ -70,28 +71,27 @@ export function DemoAssessmentControls({ initialState }: { initialState: Managed
         }
       }
     };
-    void load(!active);
-    const timer = active ? window.setInterval(() => void load(), 1_000) : undefined;
+    void load(!runningOrCleaning);
+    const timer = runningOrCleaning ? window.setInterval(() => void load(), 1_000) : undefined;
     return () => {
       disposed = true;
       if (timer !== undefined) {
         window.clearInterval(timer);
       }
     };
-  }, [active, router]);
+  }, [active, router, runningOrCleaning]);
 
   async function mutate(endpoint: string) {
     setRequestPending(true);
     try {
       const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" } });
       const payload = await response.json() as ManagedDemoJobSnapshot | { error?: string; job?: ManagedDemoJobSnapshot };
-      if ("job" in payload && payload.job !== undefined) {
-        setJob(payload.job);
-      } else if (response.ok) {
+      if (response.ok) {
         setJob(payload as ManagedDemoJobSnapshot);
       } else {
         const message = "error" in payload && typeof payload.error === "string" ? payload.error : "The managed demo request failed.";
-        setJob((current) => ({ ...current, error: message, currentMessage: message }));
+        const returnedJob = "job" in payload ? payload.job : undefined;
+        setJob((current) => ({ ...(returnedJob ?? current), error: message, currentMessage: message }));
       }
     } catch {
       setJob((current) => ({
@@ -104,7 +104,7 @@ export function DemoAssessmentControls({ initialState }: { initialState: Managed
   }
 
   const terminal = job.status === "COMPLETED" || job.status === "FAILED" || job.status === "CANCELLED";
-  const canLaunch = !active && !requestPending && job.readiness.overall === "READY";
+  const canLaunch = !runningOrCleaning && !requestPending && job.readiness.overall === "READY";
   const scenariosComplete = job.milestones.assessmentComplete || job.milestones.replayVerification;
   const replayCurrent = job.status === "REPLAYING";
   const progress = [
@@ -145,10 +145,10 @@ export function DemoAssessmentControls({ initialState }: { initialState: Managed
               disabled={!canLaunch}
               onClick={() => void mutate(endpoints.assessment)}
             >
-              {active ? <LoaderCircle aria-hidden="true" size={15} className="job-spinner" /> : terminal ? <RotateCcw aria-hidden="true" size={15} /> : <Play aria-hidden="true" size={15} />}
-              {active ? "Assessment Running" : terminal ? "Run Again" : "Launch Demo Assessment"}
+              {runningOrCleaning ? <LoaderCircle aria-hidden="true" size={15} className="job-spinner" /> : terminal ? <RotateCcw aria-hidden="true" size={15} /> : <Play aria-hidden="true" size={15} />}
+              {job.cleanupPending === true ? "Stopping Assessment" : active ? "Assessment Running" : terminal ? "Run Again" : "Launch Demo Assessment"}
             </button>
-            {active ? (
+            {active && job.cleanupPending !== true ? (
               <button type="button" className="demo-stop-button" disabled={requestPending} onClick={() => void mutate(endpoints.cancel)}>
                 <Square aria-hidden="true" size={13} /> Stop Assessment
               </button>
@@ -185,7 +185,9 @@ export function DemoAssessmentControls({ initialState }: { initialState: Managed
         {job.readiness.overall === "UNAVAILABLE" && !active ? <p className="job-error"><strong>Launch unavailable:</strong> {job.readiness.message}</p> : null}
         {job.result !== undefined ? (
           <div className="job-result-summary">
-            {job.result.zeroFindingsMessage !== undefined ? <strong>{job.result.zeroFindingsMessage}</strong> : null}
+            {job.result.zeroFindingsMessage !== undefined || job.result.resultMessage !== undefined
+              ? <strong>{job.result.zeroFindingsMessage ?? job.result.resultMessage}</strong>
+              : null}
             <dl>
               <div><dt>Scenarios</dt><dd>{job.result.scenariosExecuted}</dd></div>
               <div><dt>Candidates</dt><dd>{job.result.candidateCount}</dd></div>

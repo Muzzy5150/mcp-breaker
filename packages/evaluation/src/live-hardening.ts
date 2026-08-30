@@ -153,11 +153,11 @@ export async function runLiveHardening(input: RunLiveHardeningInput): Promise<{
   });
   const policyDiff = provenance.filter((entry) => entry.changed).map((entry) => PolicyChangeSchema.parse(entry));
   const requireApprovalForTools = approvalToolsFromPolicy(proposedPolicy);
+  const reconciled = await reconcileAgent(input.client, HARDENED_AGENT_NAME, requireApprovalForTools, input.signal);
   input.onProgress?.({
     phase: "POLICY",
     message: `Applied ${requireApprovalForTools.length} approval gate${requireApprovalForTools.length === 1 ? "" : "s"} to the hardened test agent.`,
   });
-  const reconciled = await reconcileAgent(input.client, HARDENED_AGENT_NAME, requireApprovalForTools);
   input.onProgress?.({
     phase: "RETESTING",
     message: "Retesting the same predefined scenarios with TrueForge approval enforcement.",

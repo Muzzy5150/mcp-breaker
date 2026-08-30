@@ -1,4 +1,4 @@
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 
 import { DemoToolService, startDemoMcpHttpServer, type RunningDemoMcpHttpServer } from "@mcp-breaker/demo-target";
@@ -61,6 +61,7 @@ export interface ManagedDemoResultSummary {
   approvalEvents: number;
   blockedActions: number;
   zeroFindingsMessage?: typeof ZERO_FINDINGS_MESSAGE;
+  resultMessage?: string;
 }
 
 export interface ManagedDemoJobSnapshot {
@@ -75,6 +76,7 @@ export interface ManagedDemoJobSnapshot {
   scenarioIndex?: number;
   scenarioCount?: number;
   error?: string;
+  cleanupPending?: boolean;
   readiness: ManagedDemoReadiness;
   milestones: ManagedDemoMilestones;
   result?: ManagedDemoResultSummary;
@@ -173,7 +175,11 @@ export class ManagedDemoJobManager {
   }
 
   async status(options: { ensureReadiness?: boolean; refreshReadiness?: boolean } = {}): Promise<ManagedDemoJobSnapshot> {
-    if ((options.ensureReadiness === true || options.refreshReadiness === true) && !isManagedDemoJobActive(this.#snapshot.status)) {
+    if (
+      (options.ensureReadiness === true || options.refreshReadiness === true) &&
+      !isManagedDemoJobActive(this.#snapshot.status) &&
+      this.#snapshot.cleanupPending !== true
+    ) {
       await this.refreshReadiness(options.refreshReadiness === true);
     }
     return this.snapshot();
@@ -223,19 +229,25 @@ export class ManagedDemoJobManager {
     return this.#start("HARDENING");
   }
 
-  async cancel(): Promise<ManagedDemoJobSnapshot> {
+  cancel(): ManagedDemoJobSnapshot {
     if (!isManagedDemoJobActive(this.#snapshot.status) || this.#controller === undefined || this.#run === undefined) {
       throw new ManagedDemoNotReadyError("No managed demo assessment is currently running.");
     }
-    this.#snapshot.currentMessage = "Stopping active TrueForge sessions and cleaning up the managed MCP target.";
-    this.#snapshot.updatedAt = this.#now();
+    const updatedAt = this.#now();
+    this.#snapshot = {
+      ...this.#snapshot,
+      status: "CANCELLED",
+      updatedAt,
+      completedAt: updatedAt,
+      cleanupPending: true,
+      currentMessage: "Cancellation requested. Stopping active TrueForge sessions and cleaning up the managed MCP target.",
+    };
     this.#controller.abort();
-    await this.#run;
     return this.snapshot();
   }
 
   #start(action: ManagedDemoAction): ManagedDemoJobSnapshot {
-    if (isManagedDemoJobActive(this.#snapshot.status)) {
+    if (isManagedDemoJobActive(this.#snapshot.status) || this.#run !== undefined) {
       throw new ManagedDemoConflictError("A managed demo assessment is already running.");
     }
     this.#sequence += 1;
@@ -268,12 +280,16 @@ export class ManagedDemoJobManager {
       if (this.#snapshot.jobId !== jobId) {
         return;
       }
+      if (controller.signal.aborted) {
+        throw new Error("Managed demo assessment cancelled before completion.");
+      }
       const completedAt = this.#now();
       const completedSnapshot = cloneSnapshot(this.#snapshot);
       delete completedSnapshot.currentScenario;
       delete completedSnapshot.scenarioIndex;
       delete completedSnapshot.scenarioCount;
       delete completedSnapshot.error;
+      delete completedSnapshot.cleanupPending;
       this.#snapshot = {
         ...completedSnapshot,
         status: "COMPLETED",
@@ -296,6 +312,7 @@ export class ManagedDemoJobManager {
       delete failedSnapshot.scenarioIndex;
       delete failedSnapshot.scenarioCount;
       delete failedSnapshot.error;
+      delete failedSnapshot.cleanupPending;
       this.#snapshot = {
         ...failedSnapshot,
         status: cancelled ? "CANCELLED" : "FAILED",
@@ -305,6 +322,7 @@ export class ManagedDemoJobManager {
           ? "Assessment cancelled. Owned sessions and the managed MCP target were cleaned up."
           : "The managed demo assessment could not complete.",
         ...(cancelled ? {} : { error: errorMessage(error) }),
+        ...(cancelled ? { cleanupPending: false } : {}),
       };
     } finally {
       if (this.#snapshot.jobId === jobId) {
@@ -382,7 +400,7 @@ function progressEvent(
   };
 }
 
-function assessmentSummary(report: LiveAssessmentReport): ManagedDemoResultSummary {
+export function summarizeManagedAssessment(report: LiveAssessmentReport): ManagedDemoResultSummary {
   const approvals = report.executions.flatMap((execution) => execution.approvals);
   return {
     kind: "ASSESSMENT",
@@ -399,7 +417,7 @@ function assessmentSummary(report: LiveAssessmentReport): ManagedDemoResultSumma
   };
 }
 
-function hardeningSummary(report: LiveHardeningReport): ManagedDemoResultSummary {
+export function summarizeManagedHardening(report: LiveHardeningReport): ManagedDemoResultSummary {
   const approvals = [report.baselineAssessment, report.hardenedAssessment]
     .flatMap((assessment) => assessment.executions)
     .flatMap((execution) => execution.approvals);
@@ -416,7 +434,11 @@ function hardeningSummary(report: LiveHardeningReport): ManagedDemoResultSummary
     inconclusiveCount: report.hardenedAssessment.counts.inconclusive,
     approvalEvents: approvals.length,
     blockedActions: approvals.filter((approval) => approval.status === "deny").length,
-    ...(report.hardenedAssessment.verifiedFindings.length === 0 ? { zeroFindingsMessage: ZERO_FINDINGS_MESSAGE } : {}),
+    ...(report.baselineAssessment.verifiedFindings.length === 0 && report.hardenedAssessment.verifiedFindings.length === 0
+      ? { zeroFindingsMessage: ZERO_FINDINGS_MESSAGE }
+      : report.hardenedAssessment.verifiedFindings.length === 0
+        ? { resultMessage: `The hardened retest completed with 0 replay-verified findings after ${report.baselineAssessment.verifiedFindings.length} baseline finding${report.baselineAssessment.verifiedFindings.length === 1 ? "" : "s"}.` }
+        : {}),
   };
 }
 
@@ -426,12 +448,74 @@ export function defaultManagedDemoArtifactDirectory(cwd = process.cwd()): string
     : resolve(cwd, "artifacts");
 }
 
-async function writeArtifact(directory: string, name: string, value: unknown): Promise<void> {
-  await mkdir(directory, { recursive: true });
+export interface ManagedArtifactOperations {
+  ensureDirectory(path: string): Promise<void>;
+  write(path: string, content: string): Promise<void>;
+  rename(from: string, to: string): Promise<void>;
+  remove(path: string): Promise<void>;
+}
+
+const defaultArtifactOperations: ManagedArtifactOperations = {
+  ensureDirectory: async (path) => { await mkdir(path, { recursive: true }); },
+  write: async (path, content) => { await writeFile(path, content, { encoding: "utf8", mode: 0o600 }); },
+  rename,
+  remove: async (path) => { await rm(path, { force: true }); },
+};
+
+interface StagedArtifact { temporary: string; destination: string }
+
+async function stageArtifact(
+  directory: string,
+  name: string,
+  value: unknown,
+  operations: ManagedArtifactOperations,
+): Promise<StagedArtifact> {
+  await operations.ensureDirectory(directory);
   const destination = resolve(directory, name);
   const temporary = resolve(directory, `.${name}.${process.pid}.tmp`);
-  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  await rename(temporary, destination);
+  await operations.write(temporary, `${JSON.stringify(value, null, 2)}\n`);
+  return { temporary, destination };
+}
+
+async function writeArtifact(directory: string, name: string, value: unknown): Promise<void> {
+  const staged = await stageArtifact(directory, name, value, defaultArtifactOperations);
+  try {
+    await defaultArtifactOperations.rename(staged.temporary, staged.destination);
+  } catch (error) {
+    await defaultArtifactOperations.remove(staged.temporary);
+    throw error;
+  }
+}
+
+export async function publishManagedHardeningArtifacts(
+  directory: string,
+  report: LiveHardeningReport,
+  operations: ManagedArtifactOperations = defaultArtifactOperations,
+): Promise<{ assessmentUpdated: boolean }> {
+  const assessment = await stageArtifact(directory, "live-assessment.json", report.baselineAssessment, operations);
+  let hardening: StagedArtifact;
+  try {
+    hardening = await stageArtifact(directory, "live-hardening.json", report, operations);
+  } catch (error) {
+    await operations.remove(assessment.temporary);
+    throw error;
+  }
+  try {
+    await operations.rename(hardening.temporary, hardening.destination);
+  } catch (error) {
+    await Promise.allSettled([
+      operations.remove(hardening.temporary),
+      operations.remove(assessment.temporary),
+    ]);
+    throw error;
+  }
+  try {
+    await operations.rename(assessment.temporary, assessment.destination);
+    return { assessmentUpdated: true };
+  } catch {
+    await operations.remove(assessment.temporary);
+    return { assessmentUpdated: false };
+  }
 }
 
 export function createManagedDemoJobManager(options: { artifactDirectory?: string } = {}): ManagedDemoJobManager {
@@ -450,27 +534,28 @@ export function createManagedDemoJobManager(options: { artifactDirectory?: strin
       };
       context.signal.addEventListener("abort", cancelActiveSessions, { once: true });
       try {
-        const platform = await runTrueForgePlatformReadiness(client);
+        const platform = await runTrueForgePlatformReadiness(client, context.signal);
+        context.signal.throwIfAborted();
         const readiness = readinessFromPlatform(platform);
         if (!platform.ok) {
           throw new Error(readiness.message);
         }
         context.emit({ type: "RUNTIME_READY", readiness, message: "TrueForge, GPT-5.6 Terra, and Daytona are ready." });
-        if (context.signal.aborted) {
-          throw new Error("Managed demo assessment cancelled before target startup.");
-        }
+        context.signal.throwIfAborted();
         try {
           server = await startDemoMcpHttpServer({ host: "127.0.0.1", port: 18880, service: new DemoToolService() });
         } catch (error) {
           throw normalizeManagedDemoError(error);
         }
         context.emit({ type: "TARGET_STARTED", message: "Disposable MCP target started on managed loopback port 18880." });
-        const doctor = await runTrueForgeDoctor(client);
+        const doctor = await runTrueForgeDoctor(client, { readiness: platform, signal: context.signal });
+        context.signal.throwIfAborted();
         if (!doctor.ok) {
           throw new Error(doctor.messages.join(" "));
         }
         context.emit({ type: "TOOLS_DISCOVERED", message: `TrueForge discovered and validated ${doctor.toolNames.length} demo tools.` });
-        const baseline = await reconcileAgent(client, BASELINE_AGENT_NAME, []);
+        const baseline = await reconcileAgent(client, BASELINE_AGENT_NAME, [], context.signal);
+        context.signal.throwIfAborted();
         const lifecycle = {
           onSessionCreated: (sessionId: string) => activeSessions.add(sessionId),
           onSessionCompleted: (sessionId: string) => activeSessions.delete(sessionId),
@@ -485,7 +570,7 @@ export function createManagedDemoJobManager(options: { artifactDirectory?: strin
             onProgress: (event) => context.emit(progressEvent(event, "ASSESSMENT")),
           });
           await writeArtifact(artifactDirectory, "live-assessment.json", report);
-          return assessmentSummary(report);
+          return summarizeManagedAssessment(report);
         }
         const result = await runLiveHardening({
           client,
@@ -503,9 +588,8 @@ export function createManagedDemoJobManager(options: { artifactDirectory?: strin
             }
           },
         });
-        await writeArtifact(artifactDirectory, "live-assessment.json", result.report.baselineAssessment);
-        await writeArtifact(artifactDirectory, "live-hardening.json", result.report);
-        return hardeningSummary(result.report);
+        await publishManagedHardeningArtifacts(artifactDirectory, result.report);
+        return summarizeManagedHardening(result.report);
       } finally {
         context.signal.removeEventListener("abort", cancelActiveSessions);
         if (context.signal.aborted) {

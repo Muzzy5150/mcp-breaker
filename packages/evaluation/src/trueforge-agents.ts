@@ -66,14 +66,15 @@ export async function reconcileAgent(
   client: TrueForgeFacade,
   name: string,
   requireApprovalForTools: readonly string[],
+  signal?: AbortSignal,
 ): Promise<{ agent: TrueForgeAgentRecord; action: "CREATED" | "UPDATED" | "UNCHANGED" }> {
   const desired = targetAgentManifest(requireApprovalForTools);
-  const existing = (await client.listAgents()).find((candidate) => candidate.name === name);
+  const existing = (await client.listAgents(signal)).find((candidate) => candidate.name === name);
   if (existing === undefined) {
-    return { agent: await client.createAgent(name, desired), action: "CREATED" };
+    return { agent: await client.createAgent(name, desired, signal), action: "CREATED" };
   }
   if (sameManifest(existing.manifest, desired)) {
     return { agent: existing, action: "UNCHANGED" };
   }
-  return { agent: await client.updateAgent(existing.id, desired), action: "UPDATED" };
+  return { agent: await client.updateAgent(existing.id, desired, signal), action: "UPDATED" };
 }

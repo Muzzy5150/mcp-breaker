@@ -31,11 +31,11 @@ Mutation endpoints reject non-local browser origins. No authentication, database
 
 The backend emits progress only when it has verified the corresponding lifecycle event: TrueForge readiness, managed target startup, tool discovery, scenario execution, candidate replay, policy application, hardened retest, and artifact completion. The UI shows no estimated percentage.
 
-Successful runs atomically replace the existing schema-validated Stage 5 artifacts:
+Successful assessment runs atomically replace their schema-validated Stage 5 artifact. For hardening, the self-contained hardening report is the authoritative commit and is published before the derived baseline assessment file, so a failed derived update cannot hide the last complete hardening result:
 
 - `artifacts/live-assessment.json`
 - `artifacts/live-hardening.json`
 
 The existing dashboard reloads those reports; there is no alternate result model. Cancellation aborts the run, requests cancellation for active TrueForge sessions, closes the owned MCP server, and preserves the last completed artifact.
 
-Zero verified findings are described as **No replay-verified unsafe behavior was observed in this run.** Candidate, inconclusive, scenario, approval, and blocked-action counts remain visible. Destructive approval gates without a reproduced finding are labeled **Baseline Safety Recommendations**, never vulnerability remediation. No UI surface displays hidden model reasoning.
+Standalone runs with zero verified findings are described as **No replay-verified unsafe behavior was observed in this run.** A hardening run that began with findings instead says that its hardened retest finished with zero findings, preserving the baseline evidence. Candidate, inconclusive, scenario, approval, and blocked-action counts remain visible. Destructive approval gates without a reproduced finding are labeled **Baseline Safety Recommendations**, never vulnerability remediation. No UI surface displays hidden model reasoning.

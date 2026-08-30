@@ -6,12 +6,16 @@ import {
   ManagedDemoJobManager,
   ManagedDemoNotReadyError,
   normalizeManagedDemoError,
+  publishManagedHardeningArtifacts,
+  summarizeManagedHardening,
   ZERO_FINDINGS_MESSAGE,
+  type ManagedArtifactOperations,
   type ManagedDemoJobServices,
   type ManagedDemoJobSnapshot,
   type ManagedDemoReadiness,
   type ManagedDemoResultSummary,
 } from "@mcp-breaker/evaluation";
+import type { LiveHardeningReport } from "@mcp-breaker/shared";
 
 import { DemoAssessmentControls } from "../apps/dashboard/src/components/demo-assessment-controls.js";
 
@@ -93,18 +97,24 @@ describe("Stage 5.5 managed website job", () => {
     expect(failed.error).toContain("did not terminate that process");
   });
 
-  it("cancels an active job and rejects cancellation while idle", async () => {
+  it("marks cancellation promptly while cleanup continues, then confirms cleanup", async () => {
+    let finish: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => { finish = resolve; });
     const manager = new ManagedDemoJobManager(services(async (_action, context) => {
       context.emit({ type: "RUNTIME_READY", readiness: ready, message: "Runtime ready." });
-      await new Promise<void>((_resolve, reject) => {
-        context.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
-      });
+      await gate;
       return zeroFindingResult;
     }));
-    await expect(manager.cancel()).rejects.toBeInstanceOf(ManagedDemoNotReadyError);
+    expect(() => manager.cancel()).toThrow(ManagedDemoNotReadyError);
     manager.startAssessment();
     await waitForStatus(manager, "STARTING");
-    expect((await manager.cancel()).status).toBe("CANCELLED");
+    const cancelled = manager.cancel();
+    expect(cancelled.status).toBe("CANCELLED");
+    expect(cancelled.cleanupPending).toBe(true);
+    expect(() => manager.startAssessment()).toThrow(ManagedDemoConflictError);
+    finish?.();
+    await vi.waitFor(() => expect(manager.snapshot().cleanupPending).toBe(false));
+    expect(manager.snapshot().currentMessage).toContain("cleaned up");
   });
 
   it("starts hardening only after completion and exposes the retest state", async () => {
@@ -172,5 +182,51 @@ describe("Stage 5.5 managed website job", () => {
     expect(html).toContain("job-progress-pending");
     expect(html).not.toMatch(/\b\d{1,3}%\b/);
     expect(html).not.toContain("chain-of-thought");
+  });
+
+  it("qualifies a clean hardened retest when the same run observed baseline findings", () => {
+    const assessment = {
+      securityAssessment: { score: 70 },
+      verifiedFindings: [{ stableId: "finding-1" }, { stableId: "finding-2" }],
+      executions: [],
+      counts: { scenariosExecuted: 8, candidates: 3, inconclusive: 0 },
+    };
+    const report = {
+      runId: "hardening-run",
+      reportVersion: "3.1.0",
+      baselineAssessment: assessment,
+      hardenedAssessment: {
+        securityAssessment: { score: 100 },
+        verifiedFindings: [],
+        executions: [],
+        counts: { scenariosExecuted: 8, candidates: 0, inconclusive: 1 },
+      },
+    } as unknown as LiveHardeningReport;
+    const summary = summarizeManagedHardening(report);
+    expect(summary.zeroFindingsMessage).toBeUndefined();
+    expect(summary.resultMessage).toBe("The hardened retest completed with 0 replay-verified findings after 2 baseline findings.");
+  });
+
+  it("commits the self-contained hardening artifact before its derived assessment", async () => {
+    const operations: string[] = [];
+    const fakeOperations: ManagedArtifactOperations = {
+      ensureDirectory: (path) => { operations.push(`mkdir:${path}`); return Promise.resolve(); },
+      write: (path) => { operations.push(`write:${path}`); return Promise.resolve(); },
+      rename: (from, to) => {
+        operations.push(`rename:${from}->${to}`);
+        return to.endsWith("live-assessment.json") ? Promise.reject(new Error("derived write failed")) : Promise.resolve();
+      },
+      remove: (path) => { operations.push(`remove:${path}`); return Promise.resolve(); },
+    };
+    const report = {
+      runId: "hardening-run",
+      reportVersion: "3.1.0",
+      baselineAssessment: { runId: "baseline" },
+    } as unknown as LiveHardeningReport;
+    const result = await publishManagedHardeningArtifacts("/tmp/artifacts", report, fakeOperations);
+    const renames = operations.filter((operation) => operation.startsWith("rename:"));
+    expect(result.assessmentUpdated).toBe(false);
+    expect(renames[0]).toContain("live-hardening.json");
+    expect(renames[1]).toContain("live-assessment.json");
   });
 });

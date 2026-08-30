@@ -77,13 +77,14 @@ export interface TrueForgePlatformReadiness {
 
 export async function runTrueForgePlatformReadiness(
   client: TrueForgeFacade,
+  signal?: AbortSignal,
 ): Promise<TrueForgePlatformReadiness> {
   const [capabilities, models, connectors, sandbox, agents] = await Promise.all([
-    client.getCapabilities(),
-    client.listModels(),
-    client.listMcpServers(),
-    client.getSandboxProvider(),
-    client.listAgents(),
+    client.getCapabilities(signal),
+    client.listModels(signal),
+    client.listMcpServers(signal),
+    client.getSandboxProvider(signal),
+    client.listAgents(signal),
   ]);
   const connector = connectors.find((candidate) => candidate.name === TRUEFORGE_CONNECTOR);
   const capabilitiesRecord = isRecord(capabilities) ? capabilities : {};
@@ -116,11 +117,14 @@ export async function runTrueForgePlatformReadiness(
   };
 }
 
-export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueForgeDoctorReport> {
-  const readiness = await runTrueForgePlatformReadiness(client);
-  const connectors = await client.listMcpServers();
-  const connector = connectors.find((candidate) => candidate.name === TRUEFORGE_CONNECTOR);
-  const tools = connector === undefined ? [] : await client.listMcpTools(connector.name);
+export async function runTrueForgeDoctor(
+  client: TrueForgeFacade,
+  options: { readiness?: TrueForgePlatformReadiness; signal?: AbortSignal } = {},
+): Promise<TrueForgeDoctorReport> {
+  const readiness = options.readiness ?? await runTrueForgePlatformReadiness(client, options.signal);
+  const tools = readiness.checks.connector
+    ? await client.listMcpTools(readiness.connector.name, options.signal)
+    : [];
   const toolNames = tools
     .map((tool) => (typeof tool.name === "string" ? tool.name : ""))
     .filter(Boolean)
@@ -152,8 +156,8 @@ export async function runTrueForgeDoctor(client: TrueForgeFacade): Promise<TrueF
     checks,
     model: TRUEFORGE_MODEL,
     connector: {
-      name: connector?.name ?? TRUEFORGE_CONNECTOR,
-      url: connector?.url ?? "missing",
+      name: readiness.connector.name,
+      url: readiness.connector.url,
       authStatus: readiness.connector.authStatus,
     },
     sandbox: readiness.sandbox,
