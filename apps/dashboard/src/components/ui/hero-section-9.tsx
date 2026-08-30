@@ -5,10 +5,11 @@ import { cn } from "../../lib/utils";
 type HeroSectionProps = {
   runId: string;
   children: ReactNode;
+  controls?: ReactNode;
   className?: string;
 };
 
-export function HeroSection({ runId, children, className }: HeroSectionProps) {
+export function HeroSection({ runId, children, controls, className }: HeroSectionProps) {
   return (
     <section className={cn("dashboard-hero", className)} aria-labelledby="dashboard-title">
       <div className="hero-light-field" aria-hidden="true">
@@ -28,6 +29,8 @@ export function HeroSection({ runId, children, className }: HeroSectionProps) {
         </p>
         <p className="run-id">Run <code>{runId}</code></p>
       </div>
+
+      {controls}
 
       <div className="hero-perspective">
         <div className="hero-product-surface">{children}</div>

@@ -126,6 +126,7 @@ async function verifyRecovery(
   client: TrueForgeFacade,
   recorder: TrueForgeEventRecorder,
   sessionId: string,
+  signal?: AbortSignal,
 ): Promise<LiveScenarioExecution["recoveryEvidence"]> {
   const turnId = recorder.turnIds.at(-1);
   if (turnId === undefined) {
@@ -141,17 +142,20 @@ async function verifyRecovery(
   let subscribeResumeVerified = false;
   const lastTurnSequenceNumber = recorder.lastServerSequenceForTurn(turnId);
   try {
-    getTurnVerified = (await client.getTurn(sessionId, turnId)) !== undefined;
-    const persisted = await client.listTurnEvents(sessionId, turnId);
+    getTurnVerified = (await client.getTurn(sessionId, turnId, signal)) !== undefined;
+    const persisted = await client.listTurnEvents(sessionId, turnId, signal);
     listTurnEventsVerified = persisted.length > 0;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5_000);
     try {
+      const resumeSignal = signal === undefined
+        ? controller.signal
+        : AbortSignal.any([signal, controller.signal]);
       const resumed = await client.subscribeToTurn(
         sessionId,
         turnId,
         Math.max(0, lastTurnSequenceNumber - 1),
-        controller.signal,
+        resumeSignal,
       );
       const result = await resumed[Symbol.asyncIterator]().next();
       subscribeResumeVerified = !result.done;
@@ -197,7 +201,7 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
   input.service.state.reset();
   const baselineState = input.service.state.snapshot();
   const priorTraceIds = new Set(input.service.traces.listTraces().map((trace) => trace.id));
-  const session = await input.client.createSession(input.agent.name);
+  const session = await input.client.createSession(input.agent.name, input.signal);
   input.onSessionCreated?.(session.id);
   let executionCompleted = false;
   try {
@@ -268,7 +272,7 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
   }
 
   for (const turnId of [...recorder.turnIds]) {
-    const persistedEvents = await input.client.listTurnEvents(session.id, turnId);
+    const persistedEvents = await input.client.listTurnEvents(session.id, turnId, input.signal);
     for (const event of persistedEvents) {
       recorder.ingest({ data: event }, turnId);
     }
@@ -319,7 +323,7 @@ async function executeLiveScenarioImplementation(input: ExecuteLiveScenarioInput
     baselineState,
     finalState,
   });
-  const recoveryEvidence = await verifyRecovery(input.client, recorder, session.id);
+  const recoveryEvidence = await verifyRecovery(input.client, recorder, session.id, input.signal);
   const execution = LiveScenarioExecutionSchema.parse({
     runId: input.runId,
     scenarioId: input.scenario.id,
@@ -404,6 +408,15 @@ export interface RunLiveAssessmentInput {
   signal?: AbortSignal;
   onSessionCreated?: (sessionId: string) => void;
   onSessionCompleted?: (sessionId: string) => void;
+  onProgress?: (event: LiveAssessmentProgressEvent) => void;
+}
+
+export interface LiveAssessmentProgressEvent {
+  phase: "SCENARIO" | "REPLAY";
+  scenarioId: string;
+  scenarioIndex: number;
+  scenarioCount: number;
+  message: string;
 }
 
 export async function runLiveAssessment(input: RunLiveAssessmentInput): Promise<LiveAssessmentReport> {
@@ -415,7 +428,14 @@ export async function runLiveAssessment(input: RunLiveAssessmentInput): Promise<
   const replayVerifications: LiveAssessmentReport["replayVerifications"] = [];
   const verifiedFindings: Finding[] = [];
 
-  for (const scenario of scenarios) {
+  for (const [scenarioIndex, scenario] of scenarios.entries()) {
+    input.onProgress?.({
+      phase: "SCENARIO",
+      scenarioId: scenario.id,
+      scenarioIndex,
+      scenarioCount: scenarios.length,
+      message: `Running predefined scenario ${scenarioIndex + 1} of ${scenarios.length}.`,
+    });
     const original = await executeLiveScenario({
       ...input,
       scenario,
@@ -427,6 +447,13 @@ export async function runLiveAssessment(input: RunLiveAssessmentInput): Promise<
     if (original.evaluation.status !== "CANDIDATE_FINDING") {
       continue;
     }
+    input.onProgress?.({
+      phase: "REPLAY",
+      scenarioId: scenario.id,
+      scenarioIndex,
+      scenarioCount: scenarios.length,
+      message: `Replay-verifying candidate behavior from scenario ${scenarioIndex + 1}.`,
+    });
     const replay = await executeLiveScenario({
       ...input,
       scenario,

@@ -22,6 +22,7 @@
     "test:live": "npm run build --silent && node packages/evaluation/dist/live-cli.js test",
     "demo": "npm run demo:hardening && npm run dev --workspace @mcp-breaker/dashboard",
     "dashboard:dev": "npm run dev --workspace @mcp-breaker/dashboard",
+    "demo:ui": "tsc -b packages/evaluation && npm run dashboard:dev",
     "lint": "eslint apps packages tests --max-warnings=0",
     "pretest": "npm run build",
     "test": "vitest run",

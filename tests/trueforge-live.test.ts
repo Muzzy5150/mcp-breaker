@@ -15,6 +15,7 @@ import {
   requireLoopbackTrueForgeUrl,
   runLiveAssessment,
   runTrueForgeDoctor,
+  runTrueForgePlatformReadiness,
   targetAgentManifest,
   TrueForgeEventRecorder,
   type TrueForgeAgentRecord,
@@ -41,6 +42,12 @@ class FakeTrueForge implements TrueForgeFacade {
   agents: TrueForgeAgentRecord[];
   created = 0;
   updated = 0;
+  capabilitiesCalls = 0;
+  modelCalls = 0;
+  mcpServerCalls = 0;
+  mcpToolCalls = 0;
+  sandboxCalls = 0;
+  agentListCalls = 0;
   #sessionNumber = 0;
 
   constructor(service = new DemoToolService(), agents: TrueForgeAgentRecord[] = []) {
@@ -49,18 +56,22 @@ class FakeTrueForge implements TrueForgeFacade {
   }
 
   async getCapabilities(): Promise<unknown> {
+    this.capabilitiesCalls += 1;
     return { sandbox: { enabled: true } };
   }
 
   async listModels(): Promise<readonly { name: string }[]> {
+    this.modelCalls += 1;
     return [{ name: "openai/gpt-5-6-terra" }];
   }
 
   async listMcpServers(): Promise<readonly { name: string; url: string; authStatus: unknown }[]> {
+    this.mcpServerCalls += 1;
     return [{ name: "mcpbreakerdemo", url: "http://127.0.0.1:18880/mcp", authStatus: { status: "not_required" } }];
   }
 
   async listMcpTools(): Promise<readonly Record<string, unknown>[]> {
+    this.mcpToolCalls += 1;
     return DEMO_TOOL_NAMES.map((name) => ({
       name,
       inputSchema: { type: "object" },
@@ -69,10 +80,12 @@ class FakeTrueForge implements TrueForgeFacade {
   }
 
   async getSandboxProvider(): Promise<{ type: string; status: string; statusReason: string | null }> {
+    this.sandboxCalls += 1;
     return { type: "daytona", status: "ready", statusReason: null };
   }
 
   async listAgents(): Promise<readonly TrueForgeAgentRecord[]> {
+    this.agentListCalls += 1;
     return this.agents;
   }
 
@@ -478,6 +491,23 @@ describe("TrueForge Stage 5 integration", () => {
     const invalidReport = await runTrueForgeDoctor(invalid);
     expect(invalidReport.ok).toBe(false);
     expect(invalidReport.invalidOutputSchemas).toContain("read_issue");
+  });
+
+  it("reuses platform readiness during doctor validation instead of repeating remote checks", async () => {
+    const fake = new FakeTrueForge(new DemoToolService(), [
+      { id: "smoke", name: "mcp-breaker-live-test", manifest: targetAgentManifest([]) },
+    ]);
+    const readiness = await runTrueForgePlatformReadiness(fake);
+    const report = await runTrueForgeDoctor(fake, { readiness });
+    expect(report.ok).toBe(true);
+    expect({
+      capabilities: fake.capabilitiesCalls,
+      models: fake.modelCalls,
+      servers: fake.mcpServerCalls,
+      sandbox: fake.sandboxCalls,
+      agents: fake.agentListCalls,
+      tools: fake.mcpToolCalls,
+    }).toEqual({ capabilities: 1, models: 1, servers: 1, sandbox: 1, agents: 1, tools: 1 });
   });
 
   it("preserves failed MCP responses as execution errors", async () => {
