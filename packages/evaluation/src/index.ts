@@ -6,6 +6,8 @@ export * from "./live-assessment.js";
 export * from "./live-hardening.js";
 export * from "./live-infrastructure.js";
 export * from "./managed-demo-job.js";
+export * from "./managed-demo-target.js";
+export * from "./mcp-inspection.js";
 export * from "./policy-adapter.js";
 export * from "./runner.js";
 export * from "./trueforge-agents.js";

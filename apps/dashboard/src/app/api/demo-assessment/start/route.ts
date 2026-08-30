@@ -13,7 +13,7 @@ export function POST(request: Request) {
   try {
     return jobResponse(getManagedDemoJob().startAssessment(), 202);
   } catch (error) {
-    if (error instanceof ManagedDemoConflictError) {
+    if (error instanceof ManagedDemoConflictError || error instanceof Error && error.name === "ManagedDemoConflictError") {
       return jobResponse({ error: error.message, job: getManagedDemoJob().snapshot() }, 409);
     }
     throw error;

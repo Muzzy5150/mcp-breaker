@@ -13,7 +13,7 @@ export function POST(request: Request) {
   try {
     return jobResponse(getManagedDemoJob().cancel());
   } catch (error) {
-    if (error instanceof ManagedDemoNotReadyError) {
+    if (error instanceof ManagedDemoNotReadyError || error instanceof Error && error.name === "ManagedDemoNotReadyError") {
       return jobResponse({ error: error.message, job: getManagedDemoJob().snapshot() }, 409);
     }
     throw error;

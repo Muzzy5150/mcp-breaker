@@ -1,7 +1,7 @@
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 
-import { DemoToolService, startDemoMcpHttpServer, type RunningDemoMcpHttpServer } from "@mcp-breaker/demo-target";
+import type { RunningDemoMcpHttpServer } from "@mcp-breaker/demo-target";
 import type { LiveAssessmentReport, LiveHardeningReport } from "@mcp-breaker/shared";
 
 import { runLiveAssessment, type LiveAssessmentProgressEvent } from "./live-assessment.js";
@@ -9,6 +9,7 @@ import { runLiveHardening, type LiveHardeningProgressEvent } from "./live-harden
 import { BASELINE_AGENT_NAME, reconcileAgent, TRUEFORGE_BASE_URL } from "./trueforge-agents.js";
 import { OfficialTrueForgeFacade } from "./trueforge-client.js";
 import { runTrueForgeDoctor, runTrueForgePlatformReadiness } from "./trueforge-doctor.js";
+import { acquireManagedDemoTarget, type ManagedDemoTargetLease } from "./managed-demo-target.js";
 
 export const MANAGED_DEMO_TARGET_NAME = "MCP Breaker Demo Target";
 export const ZERO_FINDINGS_MESSAGE = "No replay-verified unsafe behavior was observed in this run.";
@@ -107,8 +108,12 @@ export interface ManagedDemoJobServices {
   execute(action: ManagedDemoAction, context: ManagedDemoRunContext): Promise<ManagedDemoResultSummary>;
 }
 
-export class ManagedDemoConflictError extends Error {}
-export class ManagedDemoNotReadyError extends Error {}
+export class ManagedDemoConflictError extends Error {
+  override readonly name = "ManagedDemoConflictError";
+}
+export class ManagedDemoNotReadyError extends Error {
+  override readonly name = "ManagedDemoNotReadyError";
+}
 
 const waitingReadiness: ManagedDemoReadiness = {
   overall: "CHECKING",
@@ -528,6 +533,7 @@ export function createManagedDemoJobManager(options: { artifactDirectory?: strin
     execute: async (action, context) => {
       const client = new OfficialTrueForgeFacade(TRUEFORGE_BASE_URL);
       let server: RunningDemoMcpHttpServer | undefined;
+      let targetLease: ManagedDemoTargetLease | undefined;
       const activeSessions = new Set<string>();
       const cancelActiveSessions = () => {
         void Promise.allSettled([...activeSessions].map((sessionId) => client.cancelSession(sessionId)));
@@ -543,7 +549,8 @@ export function createManagedDemoJobManager(options: { artifactDirectory?: strin
         context.emit({ type: "RUNTIME_READY", readiness, message: "TrueForge, GPT-5.6 Terra, and Daytona are ready." });
         context.signal.throwIfAborted();
         try {
-          server = await startDemoMcpHttpServer({ host: "127.0.0.1", port: 18880, service: new DemoToolService() });
+          targetLease = await acquireManagedDemoTarget();
+          server = targetLease.server;
         } catch (error) {
           throw normalizeManagedDemoError(error);
         }
@@ -595,7 +602,7 @@ export function createManagedDemoJobManager(options: { artifactDirectory?: strin
         if (context.signal.aborted) {
           await Promise.allSettled([...activeSessions].map((sessionId) => client.cancelSession(sessionId)));
         }
-        await server?.close();
+        await targetLease?.release();
       }
     },
   };
