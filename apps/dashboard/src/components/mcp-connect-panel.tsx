@@ -43,6 +43,25 @@ export function McpInspectionResultPanel({
               </div>
             </div>
             <p>{tool.description}</p>
+            <details className="mcp-tool-contract">
+              <summary>Contract &amp; annotations</summary>
+              <div>
+                <strong>Input schema</strong>
+                <pre>{JSON.stringify(tool.inputSchema, null, 2)}</pre>
+              </div>
+              {tool.outputSchema !== undefined ? (
+                <div>
+                  <strong>Output schema</strong>
+                  <pre>{JSON.stringify(tool.outputSchema, null, 2)}</pre>
+                </div>
+              ) : null}
+              {tool.annotations !== undefined ? (
+                <div>
+                  <strong>Annotations</strong>
+                  <pre>{JSON.stringify(tool.annotations, null, 2)}</pre>
+                </div>
+              ) : null}
+            </details>
           </article>
         ))}
       </div>
@@ -124,6 +143,7 @@ export function McpConnectPanel({
             spellCheck={false}
             autoCapitalize="none"
             value={url}
+            disabled={pending}
             onChange={(event) => {
               setUrl(event.target.value);
               setInspection(undefined);

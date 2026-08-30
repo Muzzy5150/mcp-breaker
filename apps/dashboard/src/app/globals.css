@@ -124,6 +124,12 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .mcp-risk-list { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; }
 .mcp-risk-list span { border: 1px solid #3e3e45; border-radius: 2px; padding: 2px 4px; color: #9b9ba3; font-family: "SFMono-Regular", Consolas, monospace; font-size: .46rem; letter-spacing: .04em; }
 .mcp-discovered-tools p { margin: 8px 0 0; color: #7e7e86; font-size: .59rem; line-height: 1.4; }
+.mcp-tool-contract { margin-top: 9px; border-top: 1px solid #242427; padding-top: 7px; }
+.mcp-tool-contract summary { cursor: pointer; color: #9b9ba3; font-family: "SFMono-Regular", Consolas, monospace; font-size: .52rem; letter-spacing: .035em; }
+.mcp-tool-contract[open] summary { color: #d0d0d4; }
+.mcp-tool-contract > div { margin-top: 8px; }
+.mcp-tool-contract strong { display: block; margin-bottom: 4px; color: #85858d; font-size: .5rem; letter-spacing: .06em; text-transform: uppercase; }
+.mcp-tool-contract pre { max-height: 150px; margin: 0; overflow: auto; border: 1px solid #29292d; border-radius: 2px; background: #060607; padding: 7px; color: #adadb4; font-family: "SFMono-Regular", Consolas, monospace; font-size: .49rem; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
 .mcp-run-assessment { width: 100%; margin-top: 12px; }
 .mcp-inspection-note { margin: 12px 0 0; color: #85858d; font-size: .64rem; }
 .demo-control-panel { width: min(1080px, 100%); margin: 14px auto 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 7px; background: linear-gradient(145deg, rgba(255,255,255,.025), transparent 44%), var(--surface); box-shadow: 0 22px 54px rgba(0,0,0,.32); }

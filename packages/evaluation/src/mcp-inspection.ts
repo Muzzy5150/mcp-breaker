@@ -61,6 +61,10 @@ export function validateMcpServerUrl(rawUrl: unknown): URL {
   if (url.username !== "" || url.password !== "") {
     throw new McpInspectionValidationError("Authentication in MCP server URLs is not supported in this build.");
   }
+  if (url.hostname === "localhost") {
+    // Preserve localhost UX without trusting DNS or hosts-file resolution.
+    url.hostname = "127.0.0.1";
+  }
   url.hash = "";
   return url;
 }
@@ -94,9 +98,10 @@ function requestUrl(input: string | URL | Request): URL {
 
 function guardedLoopbackFetch(timeout: AbortSignal): typeof fetch {
   return async (input, init) => {
-    requestUrl(input);
+    const url = requestUrl(input);
+    const safeInput = input instanceof Request ? new Request(url, input) : url;
     const signal = init?.signal == null ? timeout : AbortSignal.any([init.signal, timeout]);
-    const response = await fetch(input, { ...init, redirect: "manual", signal });
+    const response = await fetch(safeInput, { ...init, redirect: "manual", signal });
     if (response.status >= 300 && response.status < 400) {
       throw new McpInspectionConnectionError("MCP inspection does not follow redirects.");
     }
@@ -104,7 +109,10 @@ function guardedLoopbackFetch(timeout: AbortSignal): typeof fetch {
   };
 }
 
-export async function inspectMcpServer(rawUrl: unknown): Promise<McpInspectionResult> {
+async function inspectMcpServerWithTrust(
+  rawUrl: unknown,
+  trustedManagedDemoTarget: boolean,
+): Promise<McpInspectionResult> {
   const url = validateMcpServerUrl(rawUrl);
   const client = new Client({ name: "mcp-breaker-inspector", version: "0.1.0" });
   const timeout = AbortSignal.timeout(CONNECTION_TIMEOUT_MS);
@@ -126,7 +134,7 @@ export async function inspectMcpServer(rawUrl: unknown): Promise<McpInspectionRe
     }
     const serverVersion = client.getServerVersion();
     const serverName = serverVersion?.name ?? "Local MCP Server";
-    const managedDemoTarget = serverName === "mcp-breaker-demo-target";
+    const managedDemoTarget = trustedManagedDemoTarget;
     const tools = discoveredTools.map((tool): McpInspectedTool => ({
       name: tool.name,
       description: tool.description ?? "No description provided by the MCP server.",
@@ -157,6 +165,10 @@ export async function inspectMcpServer(rawUrl: unknown): Promise<McpInspectionRe
   }
 }
 
+export function inspectMcpServer(rawUrl: unknown): Promise<McpInspectionResult> {
+  return inspectMcpServerWithTrust(rawUrl, false);
+}
+
 export async function inspectManagedMcpServer(rawUrl: unknown): Promise<McpInspectionResult> {
   const url = validateMcpServerUrl(rawUrl);
   if (url.toString() !== MANAGED_DEMO_MCP_URL) {
@@ -172,7 +184,7 @@ export async function inspectManagedMcpServer(rawUrl: unknown): Promise<McpInspe
     throw error;
   }
   try {
-    return await inspectMcpServer(lease.server.url);
+    return await inspectMcpServerWithTrust(lease.server.url, true);
   } finally {
     await lease.release();
   }

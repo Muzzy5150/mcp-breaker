@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
+import { startDemoMcpHttpServer, type RunningDemoMcpHttpServer } from "@mcp-breaker/demo-target";
 
 import {
   inspectManagedMcpServer,
@@ -16,22 +17,37 @@ import {
 import { McpInspectionErrorPanel, McpInspectionResultPanel } from "../apps/dashboard/src/components/mcp-connect-panel.js";
 
 let redirectServer: Server | undefined;
+let standaloneDemo: RunningDemoMcpHttpServer | undefined;
 
 afterEach(async () => {
   if (redirectServer !== undefined) {
     await new Promise<void>((resolve, reject) => redirectServer?.close((error) => error === undefined ? resolve() : reject(error)));
     redirectServer = undefined;
   }
+  await standaloneDemo?.close();
+  standaloneDemo = undefined;
 });
 
 describe("final loopback MCP connect UX", () => {
   it("accepts only the explicit loopback host allowlist", () => {
-    expect(validateMcpServerUrl("http://localhost:18880/mcp").hostname).toBe("localhost");
+    expect(validateMcpServerUrl("http://localhost:18880/mcp").hostname).toBe("127.0.0.1");
     expect(validateMcpServerUrl("http://127.0.0.1:18880/mcp").hostname).toBe("127.0.0.1");
     expect(validateMcpServerUrl("http://[::1]:18880/mcp").hostname).toBe("[::1]");
     expect(() => validateMcpServerUrl("https://example.com/mcp")).toThrow(McpInspectionValidationError);
     expect(() => validateMcpServerUrl("http://192.168.1.20/mcp")).toThrow("Only localhost");
     expect(() => validateMcpServerUrl("http://user:secret@localhost:18880/mcp")).toThrow("Authentication");
+  });
+
+  it("does not trust a directly inspected server that spoofs the managed demo name", async () => {
+    standaloneDemo = await startDemoMcpHttpServer();
+    const result = await inspectMcpServer(standaloneDemo.url);
+    expect(result.serverName).toBe("mcp-breaker-demo-target");
+    expect(result.managedDemoTarget).toBe(false);
+    expect(result.targetName).toBe("mcp-breaker-demo-target");
+    expect(result.tools.find((tool) => tool.name === "merge_pull_request")?.riskClasses).toEqual([
+      "WRITE",
+      "DESTRUCTIVE",
+    ]);
   });
 
   it("temporarily starts the actual managed demo target and discovers its real tools", async () => {
@@ -84,7 +100,9 @@ describe("final loopback MCP connect UX", () => {
         name: "api_discovered_tool",
         description: "Supplied by the inspection response.",
         riskClasses: ["UNCLASSIFIED"],
+        annotations: { readOnlyHint: false },
         inputSchema: { type: "object" },
+        outputSchema: { type: "object" },
       }],
     };
     const html = renderToStaticMarkup(
@@ -97,6 +115,9 @@ describe("final loopback MCP connect UX", () => {
     );
     expect(html).toContain("api_discovered_tool");
     expect(html).toContain("Supplied by the inspection response.");
+    expect(html).toContain("Input schema");
+    expect(html).toContain("Output schema");
+    expect(html).toContain("Annotations");
     expect(html).not.toContain("read_issue");
     expect(html).not.toContain("Run Security Assessment");
   });
