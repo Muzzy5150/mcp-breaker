@@ -1,4 +1,4 @@
-import { getManagedDemoJob, jobResponse } from "@/lib/demo-job";
+import { getManagedDemoJob, jobResponse } from "../../../../lib/demo-job";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

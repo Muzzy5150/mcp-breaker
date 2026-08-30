@@ -5,7 +5,7 @@ import {
   ManagedDemoTargetBusyError,
 } from "@mcp-breaker/evaluation";
 
-import { jobResponse, localMutationError } from "@/lib/demo-job";
+import { jobResponse, localMutationError } from "../../../../lib/demo-job";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
