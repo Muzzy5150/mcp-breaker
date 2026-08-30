@@ -1,11 +1,11 @@
 import { DEMO_TOOL_METADATA } from "@mcp-breaker/demo-target";
 
-import { DemoAssessmentControls } from "@/components/demo-assessment-controls";
-import { SecurityDashboard } from "@/components/security-dashboard";
-import { HeroSection } from "@/components/ui/hero-section-9";
-import { NeonRGBTextEffect } from "@/components/ui/neon-rgbtext-effect";
-import { loadAssessment } from "@/lib/assessment-loader";
-import { getManagedDemoJob } from "@/lib/demo-job";
+import { DemoAssessmentControls } from "../components/demo-assessment-controls";
+import { SecurityDashboard } from "../components/security-dashboard";
+import { HeroSection } from "../components/ui/hero-section-9";
+import { NeonRGBTextEffect } from "../components/ui/neon-rgbtext-effect";
+import { loadAssessment } from "../lib/assessment-loader";
+import { getManagedDemoJob } from "../lib/demo-job";
 
 export const dynamic = "force-dynamic";
 

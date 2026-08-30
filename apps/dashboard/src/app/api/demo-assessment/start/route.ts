@@ -1,6 +1,6 @@
 import { ManagedDemoConflictError } from "@mcp-breaker/evaluation";
 
-import { getManagedDemoJob, jobResponse, localMutationError } from "@/lib/demo-job";
+import { getManagedDemoJob, jobResponse, localMutationError } from "../../../../lib/demo-job";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
